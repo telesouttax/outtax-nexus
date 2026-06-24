@@ -133,7 +133,12 @@ function formatDate(iso) {
   return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
-function timeAgo(iso) {
+function formatDateTime(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+
   if (!iso) return '';
   const diff = Date.now() - new Date(iso).getTime();
   const days = Math.floor(diff / 86400000);
@@ -159,7 +164,22 @@ function showToast(message) {
   setTimeout(() => toast.classList.remove('show'), 2800);
 }
 
-// ── CHECKLIST ──
+// ── HISTORY ──
+function addHistoryItem(projectId, text) {
+  const p = DB.getProjects().find(x => x.id === projectId);
+  if (!p || !text.trim()) return;
+  const history = p.history || [];
+  history.unshift({ id: 'h_' + Date.now(), text: text.trim(), createdAt: new Date().toISOString() });
+  updateProject(projectId, { history });
+}
+
+function deleteHistoryItem(projectId, itemId) {
+  const p = DB.getProjects().find(x => x.id === projectId);
+  if (!p) return;
+  updateProject(projectId, { history: (p.history || []).filter(h => h.id !== itemId) });
+}
+
+
 function addChecklistItem(projectId, text) {
   const p = DB.getProjects().find(x => x.id === projectId);
   if (!p || !text.trim()) return;
@@ -252,6 +272,10 @@ function seedIfEmpty() {
         { id: 'ck_s2', text: 'Criar template na planilha', done: true, createdAt: new Date().toISOString() },
         { id: 'ck_s3', text: 'Testar com o time', done: false, createdAt: new Date().toISOString() },
         { id: 'ck_s4', text: 'Validar com gestor', done: false, createdAt: new Date().toISOString() },
+      ],
+      history: [
+        { id: 'h_s2', text: 'Template criado na planilha, aguardando validação do time', createdAt: new Date(Date.now() - 86400000*2).toISOString() },
+        { id: 'h_s1', text: 'Projeto iniciado, mapeamento dos campos concluído', createdAt: new Date(Date.now() - 86400000*4).toISOString() },
       ],
     },
     {
