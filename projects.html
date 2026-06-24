@@ -30,6 +30,17 @@
   </nav>
   <div class="sidebar-footer">
     <div style="padding: 0 10px; display:flex; flex-direction:column; gap:8px;">
+      <button id="fb-login-btn" class="btn btn-primary btn-sm" onclick="fbSignIn()" style="width:100%; justify-content:center; display:none;">
+        <i class="ti ti-brand-google"></i> Entrar com Google
+      </button>
+      <div id="fb-user-info" style="display:none; align-items:center; gap:8px; padding:8px 10px; background:var(--bg-hover); border-radius:var(--radius-sm);">
+        <img id="fb-user-avatar" src="" style="width:28px; height:28px; border-radius:50%; object-fit:cover;"/>
+        <div style="flex:1; min-width:0;">
+          <div id="fb-user-name" style="font-size:12px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
+          <div style="font-size:10px; color:var(--text-muted);">conectado</div>
+        </div>
+        <button type="button" onclick="fbSignOut()" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:13px;" title="Sair"><i class="ti ti-logout"></i></button>
+      </div>
       <button id="drive-connect-btn" class="btn btn-ghost btn-sm" style="width:100%; justify-content:center;">
         <i class="ti ti-brand-google-drive"></i> Conectar Drive
       </button>
@@ -257,25 +268,39 @@
 </div>
 
 <script src="app.js"></script>
+<script src="firebase.js"></script>
 <script src="drive.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
 seedIfEmpty();
 setActiveNav();
-updateNavCounts();
 
 let editingId = null;
 let editingProjectTitle = '';
+let allProjects = [];
 
-function updateNavCounts() {
-  document.getElementById('nav-projects-count').textContent = DB.getProjects().length;
-  document.getElementById('nav-ideas-count').textContent = DB.getIdeas().length;
+async function updateNavCounts() {
+  const projects = fbIsSignedIn() ? await fbGetProjects() : DB.getProjects();
+  const ideas = fbIsSignedIn() ? await fbGetIdeas() : DB.getIdeas();
+  document.getElementById('nav-projects-count').textContent = projects.length;
+  document.getElementById('nav-ideas-count').textContent = ideas.length;
 }
 
-// Init Drive after GSI loads
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
+  await firebaseInit();
+  onAuthChange(async (user) => {
+    if (user) await migrateLocalToFirebase();
+    await refreshBoard();
+    updateNavCounts();
+  });
   setTimeout(() => driveInit(), 800);
+  await refreshBoard();
 });
+
+async function refreshBoard() {
+  allProjects = fbIsSignedIn() ? await fbGetProjects() : DB.getProjects();
+  renderBoard();
+}
 
 // ── UPDATE UPLOAD UI based on drive status ──
 function updateUploadUI() {
@@ -301,7 +326,7 @@ function renderBoard() {
   const typeFilter = document.getElementById('filter-type').value;
   const prioFilter = document.getElementById('filter-priority').value;
 
-  const projects = DB.getProjects().filter(p => {
+  const projects = allProjects.filter(p => {
     if (search && !p.title.toLowerCase().includes(search) && !(p.description || '').toLowerCase().includes(search)) return false;
     if (typeFilter && p.type !== typeFilter) return false;
     if (prioFilter && p.priority !== prioFilter) return false;
@@ -423,10 +448,10 @@ function openNewProjectModal() {
   setTimeout(() => document.getElementById('new-title').focus(), 100);
 }
 
-function submitNewProject() {
+async function submitNewProject() {
   const title = document.getElementById('new-title').value.trim();
   if (!title) { document.getElementById('new-title').focus(); return; }
-  createProject({
+  const project = createProject({
     title,
     problem: document.getElementById('new-problem').value.trim(),
     description: document.getElementById('new-desc').value.trim(),
@@ -435,15 +460,16 @@ function submitNewProject() {
     responsible: document.getElementById('new-responsible').value.trim(),
     deadline: document.getElementById('new-deadline').value,
   });
+  if (fbIsSignedIn()) await fbSaveProject(project);
   closeModal('modal-new');
-  renderBoard();
+  await refreshBoard();
   updateNavCounts();
   showToast('Projeto criado');
 }
 
 // ── EDIT PROJECT ──
 function openEditModal(id) {
-  const p = DB.getProjects().find(x => x.id === id);
+  const p = allProjects.find(x => x.id === id);
   if (!p) return;
   editingId = id;
   editingProjectTitle = p.title;
@@ -491,7 +517,7 @@ function openEditModal(id) {
   openModal('modal-edit');
 }
 
-function submitEditProject() {
+async function submitEditProject() {
   if (!editingId) return;
   const updates = {
     title: document.getElementById('edit-title').value.trim(),
@@ -506,29 +532,33 @@ function submitEditProject() {
   if (document.getElementById('edit-blockers')) updates.blockers = document.getElementById('edit-blockers').value;
   if (document.getElementById('edit-scope')) updates.scope = document.getElementById('edit-scope').value;
   if (document.getElementById('edit-result')) updates.result = document.getElementById('edit-result').value;
-  updateProject(editingId, updates);
+  const updated = updateProject(editingId, updates);
+  if (fbIsSignedIn() && updated) await fbSaveProject(updated);
   closeModal('modal-edit');
-  renderBoard();
+  await refreshBoard();
   showToast('Projeto atualizado');
 }
 
-function moveStage(id, direction) {
-  const p = DB.getProjects().find(x => x.id === id);
+async function moveStage(id, direction) {
+  const p = allProjects.find(x => x.id === id);
   if (!p) return;
   const newStage = direction === 'next' ? nextStage(p.stage) : prevStage(p.stage);
   const stageLabel = STAGES.find(s => s.id === newStage)?.label;
-  updateProject(id, { stage: newStage, progress: newStage === 'entregue' ? 100 : p.progress });
-  addHistoryItem(id, `Etapa alterada para: ${stageLabel}`);
+  const updated = updateProject(id, { stage: newStage, progress: newStage === 'entregue' ? 100 : p.progress });
+  addHistoryItem(id, 'Etapa alterada para: ' + stageLabel);
+  const withHistory = DB.getProjects().find(x => x.id === id);
+  if (fbIsSignedIn() && withHistory) await fbSaveProject(withHistory);
   closeModal('modal-edit');
-  renderBoard();
-  showToast(`Movido para: ${stageLabel}`);
+  await refreshBoard();
+  showToast('Movido para: ' + stageLabel);
 }
 
-function confirmDelete() {
+async function confirmDelete() {
   if (!confirm('Excluir este projeto? Esta ação não pode ser desfeita.')) return;
   deleteProject(editingId);
+  if (fbIsSignedIn()) await fbDeleteProject(editingId);
   closeModal('modal-edit');
-  renderBoard();
+  await refreshBoard();
   updateNavCounts();
   showToast('Projeto excluído');
 }
@@ -536,7 +566,7 @@ function confirmDelete() {
 // ── PDF EXPORT ──
 function exportProjectPDF() {
   if (!editingId) return;
-  const p = DB.getProjects().find(x => x.id === editingId);
+  const p = allProjects.find(x => x.id === editingId);
   if (!p) return;
 
   const stage = STAGES.find(s => s.id === p.stage);
@@ -679,21 +709,25 @@ function renderHistory(p) {
     </div>`).join('');
 }
 
-function addHistoryItemUI() {
+async function addHistoryItemUI() {
   const input = document.getElementById('history-new-input');
   const text = input?.value.trim();
   if (!text || !editingId) return;
   addHistoryItem(editingId, text);
   input.value = '';
   const p = DB.getProjects().find(x => x.id === editingId);
+  if (fbIsSignedIn() && p) await fbSaveProject(p);
+  allProjects = allProjects.map(x => x.id === editingId ? p : x);
   renderHistory(p);
   showToast('Atualização registrada');
 }
 
-function handleDeleteHistory(itemId) {
+async function handleDeleteHistory(itemId) {
   if (!editingId) return;
   deleteHistoryItem(editingId, itemId);
   const p = DB.getProjects().find(x => x.id === editingId);
+  if (fbIsSignedIn() && p) await fbSaveProject(p);
+  allProjects = allProjects.map(x => x.id === editingId ? p : x);
   renderHistory(p);
 }
 
@@ -735,29 +769,35 @@ function renderChecklist(p) {
   }
 }
 
-function addChecklistItemUI() {
+async function addChecklistItemUI() {
   const input = document.getElementById('checklist-new-input');
   const text = input?.value.trim();
   if (!text || !editingId) return;
   addChecklistItem(editingId, text);
   input.value = '';
   const p = DB.getProjects().find(x => x.id === editingId);
+  if (fbIsSignedIn() && p) await fbSaveProject(p);
+  allProjects = allProjects.map(x => x.id === editingId ? p : x);
   renderChecklist(p);
   renderBoard();
 }
 
-function handleToggleCheck(itemId) {
+async function handleToggleCheck(itemId) {
   if (!editingId) return;
   toggleChecklistItem(editingId, itemId);
   const p = DB.getProjects().find(x => x.id === editingId);
+  if (fbIsSignedIn() && p) await fbSaveProject(p);
+  allProjects = allProjects.map(x => x.id === editingId ? p : x);
   renderChecklist(p);
   renderBoard();
 }
 
-function handleDeleteCheck(itemId) {
+async function handleDeleteCheck(itemId) {
   if (!editingId) return;
   deleteChecklistItem(editingId, itemId);
   const p = DB.getProjects().find(x => x.id === editingId);
+  if (fbIsSignedIn() && p) await fbSaveProject(p);
+  allProjects = allProjects.map(x => x.id === editingId ? p : x);
   renderChecklist(p);
   renderBoard();
 }
