@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FlowDesk — Projetos</title>
+  <link rel="stylesheet" href="style.css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css"/>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="wordmark"><div class="dot"></div>FlowDesk</div>
+    <div class="tagline">Gestão de processos</div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-section-label">Menu</div>
+    <a class="nav-item" data-page="index.html" href="index.html">
+      <i class="ti ti-layout-dashboard nav-icon"></i> Dashboard
+    </a>
+    <a class="nav-item" data-page="projects.html" href="projects.html">
+      <i class="ti ti-layout-kanban nav-icon"></i> Projetos
+      <span class="nav-badge" id="nav-projects-count">0</span>
+    </a>
+    <a class="nav-item" data-page="ideas.html" href="ideas.html">
+      <i class="ti ti-bulb nav-icon"></i> Banco de ideias
+      <span class="nav-badge" id="nav-ideas-count">0</span>
+    </a>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="text-muted" style="font-size:11px; padding: 0 10px;">
+      <i class="ti ti-info-circle" style="font-size:12px; vertical-align:-1px;"></i>
+      Piloto v1.0
+    </div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+  <div class="topbar">
+    <div>
+      <div class="topbar-title">Projetos</div>
+      <div class="topbar-sub">Fluxo de etapas</div>
+    </div>
+    <button class="btn btn-primary" onclick="openNewProjectModal()">
+      <i class="ti ti-plus"></i> Novo projeto
+    </button>
+  </div>
+
+  <div class="page-content">
+    <div class="filter-bar">
+      <input type="text" class="form-input" placeholder="Buscar projeto..." id="search-input" oninput="renderBoard()"/>
+      <select class="form-select" id="filter-type" onchange="renderBoard()" style="width:auto;">
+        <option value="">Todos os tipos</option>
+        <option>Processo</option>
+        <option>Melhoria</option>
+        <option>Automação</option>
+        <option>Fluxo</option>
+        <option>Outro</option>
+      </select>
+      <select class="form-select" id="filter-priority" onchange="renderBoard()" style="width:auto;">
+        <option value="">Todas prioridades</option>
+        <option>Alta</option>
+        <option>Média</option>
+        <option>Baixa</option>
+      </select>
+    </div>
+
+    <div class="kanban-board" id="kanban-board"></div>
+  </div>
+</main>
+
+<!-- MODAL: NEW PROJECT -->
+<div class="modal-overlay hidden" id="modal-new">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Novo projeto</div>
+      <button class="modal-close" onclick="closeModal('modal-new')">✕</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Título do projeto *</label>
+      <input type="text" class="form-input" id="new-title" placeholder="Ex: Automatizar relatório semanal"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Problema a resolver</label>
+      <textarea class="form-textarea" id="new-problem" placeholder="Qual dor ou ineficiência esse projeto resolve?"></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Descrição</label>
+      <textarea class="form-textarea" id="new-desc" placeholder="Detalhe o que será feito..."></textarea>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Tipo</label>
+        <select class="form-select" id="new-type">
+          <option>Processo</option>
+          <option>Melhoria</option>
+          <option>Automação</option>
+          <option>Fluxo</option>
+          <option>Outro</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Prioridade</label>
+        <select class="form-select" id="new-priority">
+          <option>Alta</option>
+          <option selected>Média</option>
+          <option>Baixa</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Responsável</label>
+        <input type="text" class="form-input" id="new-responsible" placeholder="Nome"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Prazo estimado</label>
+        <input type="date" class="form-input" id="new-deadline"/>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-new')">Cancelar</button>
+      <button class="btn btn-primary" onclick="submitNewProject()">
+        <i class="ti ti-plus"></i> Criar projeto
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: EDIT/DETAIL PROJECT -->
+<div class="modal-overlay hidden" id="modal-edit">
+  <div class="modal" style="max-width:600px;">
+    <div class="modal-header">
+      <div class="modal-title" id="edit-modal-title">Editar projeto</div>
+      <button class="modal-close" onclick="closeModal('modal-edit')">✕</button>
+    </div>
+
+    <!-- Stage flow indicator -->
+    <div class="stage-flow" id="edit-stage-flow"></div>
+
+    <div class="form-group">
+      <label class="form-label">Título</label>
+      <input type="text" class="form-input" id="edit-title"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Problema a resolver</label>
+      <textarea class="form-textarea" id="edit-problem"></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Descrição</label>
+      <textarea class="form-textarea" id="edit-desc"></textarea>
+    </div>
+
+    <div id="stage-specific-fields"></div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Tipo</label>
+        <select class="form-select" id="edit-type">
+          <option>Processo</option><option>Melhoria</option><option>Automação</option><option>Fluxo</option><option>Outro</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Prioridade</label>
+        <select class="form-select" id="edit-priority">
+          <option>Alta</option><option>Média</option><option>Baixa</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Responsável</label>
+        <input type="text" class="form-input" id="edit-responsible"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Prazo estimado</label>
+        <input type="date" class="form-input" id="edit-deadline"/>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Progresso (%)</label>
+      <div style="display:flex; align-items:center; gap:12px;">
+        <input type="range" min="0" max="100" step="5" class="form-input" id="edit-progress" style="padding:0; border:none; background:none; cursor:pointer;" oninput="document.getElementById('edit-progress-val').textContent=this.value+'%'"/>
+        <span id="edit-progress-val" style="font-family:var(--mono); font-size:13px; min-width:36px;">0%</span>
+      </div>
+    </div>
+
+    <div class="form-actions" style="justify-content:space-between;">
+      <button class="btn btn-ghost" style="color:var(--coral); border-color:rgba(248,113,113,0.3);" onclick="confirmDelete()">
+        <i class="ti ti-trash"></i> Excluir
+      </button>
+      <div style="display:flex; gap:10px;">
+        <button class="btn btn-ghost" onclick="closeModal('modal-edit')">Cancelar</button>
+        <button class="btn btn-primary" onclick="submitEditProject()">
+          <i class="ti ti-device-floppy"></i> Salvar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+seedIfEmpty();
+setActiveNav();
+updateNavCounts();
+
+let editingId = null;
+
+function updateNavCounts() {
+  document.getElementById('nav-projects-count').textContent = DB.getProjects().length;
+  document.getElementById('nav-ideas-count').textContent = DB.getIdeas().length;
+}
+
+// ── RENDER BOARD ──
+function renderBoard() {
+  const search = document.getElementById('search-input').value.toLowerCase();
+  const typeFilter = document.getElementById('filter-type').value;
+  const prioFilter = document.getElementById('filter-priority').value;
+
+  let projects = DB.getProjects().filter(p => {
+    if (search && !p.title.toLowerCase().includes(search) && !p.description?.toLowerCase().includes(search)) return false;
+    if (typeFilter && p.type !== typeFilter) return false;
+    if (prioFilter && p.priority !== prioFilter) return false;
+    return true;
+  });
+
+  const board = document.getElementById('kanban-board');
+  board.innerHTML = '';
+
+  STAGES.forEach(stage => {
+    const stageProjects = projects.filter(p => p.stage === stage.id);
+    const col = document.createElement('div');
+    col.className = 'kanban-column';
+    col.innerHTML = `
+      <div class="kanban-header">
+        <div class="col-title">
+          <span class="stage-badge stage-${stage.id}"><span class="stage-dot"></span>${stage.label}</span>
+        </div>
+        <span class="col-count">${stageProjects.length}</span>
+      </div>
+      <div class="kanban-body" id="col-${stage.id}">
+        ${stageProjects.length === 0 ? `<div class="empty-state" style="padding:24px 12px;"><div class="empty-icon" style="font-size:20px;">${stage.icon}</div><p style="font-size:11px;">Nenhum projeto aqui</p></div>` : ''}
+      </div>`;
+    board.appendChild(col);
+
+    const body = document.getElementById(`col-${stage.id}`);
+    stageProjects.forEach(p => {
+      const card = document.createElement('div');
+      card.className = 'project-card';
+      card.onclick = () => openEditModal(p.id);
+      card.innerHTML = `
+        <div class="card-title">${p.title}</div>
+        ${p.description ? `<div class="card-desc">${p.description}</div>` : ''}
+        <div class="card-meta">
+          <span class="priority-badge priority-${p.priority.toLowerCase()}">${p.priority}</span>
+          <span style="font-size:10px; color:var(--text-muted); padding:2px 6px; background:var(--bg-surface); border-radius:4px; border:1px solid var(--border);">${p.type}</span>
+          ${p.deadline ? `<span class="card-date"><i class="ti ti-calendar" style="font-size:10px;"></i> ${formatDate(p.deadline)}</span>` : `<span class="card-date">${timeAgo(p.updatedAt)}</span>`}
+        </div>
+        ${p.progress > 0 ? `<div class="progress-bar"><div class="progress-fill" style="width:${p.progress}%"></div></div>` : ''}`;
+      body.appendChild(card);
+    });
+  });
+}
+
+// ── NEW PROJECT ──
+function openNewProjectModal() {
+  document.getElementById('new-title').value = '';
+  document.getElementById('new-problem').value = '';
+  document.getElementById('new-desc').value = '';
+  document.getElementById('new-responsible').value = '';
+  document.getElementById('new-deadline').value = '';
+  openModal('modal-new');
+  setTimeout(() => document.getElementById('new-title').focus(), 100);
+}
+
+function submitNewProject() {
+  const title = document.getElementById('new-title').value.trim();
+  if (!title) { document.getElementById('new-title').focus(); return; }
+  createProject({
+    title,
+    problem: document.getElementById('new-problem').value.trim(),
+    description: document.getElementById('new-desc').value.trim(),
+    type: document.getElementById('new-type').value,
+    priority: document.getElementById('new-priority').value,
+    responsible: document.getElementById('new-responsible').value.trim(),
+    deadline: document.getElementById('new-deadline').value,
+  });
+  closeModal('modal-new');
+  renderBoard();
+  updateNavCounts();
+  showToast('Projeto criado com sucesso');
+}
+
+// ── EDIT PROJECT ──
+function openEditModal(id) {
+  const p = DB.getProjects().find(x => x.id === id);
+  if (!p) return;
+  editingId = id;
+
+  document.getElementById('edit-modal-title').textContent = p.title;
+  document.getElementById('edit-title').value = p.title;
+  document.getElementById('edit-problem').value = p.problem || '';
+  document.getElementById('edit-desc').value = p.description || '';
+  document.getElementById('edit-type').value = p.type || 'Processo';
+  document.getElementById('edit-priority').value = p.priority || 'Média';
+  document.getElementById('edit-responsible').value = p.responsible || '';
+  document.getElementById('edit-deadline').value = p.deadline || '';
+  document.getElementById('edit-progress').value = p.progress || 0;
+  document.getElementById('edit-progress-val').textContent = (p.progress || 0) + '%';
+
+  // Stage flow
+  const flow = document.getElementById('edit-stage-flow');
+  const currentIdx = stageIndex(p.stage);
+  flow.innerHTML = STAGES.map((s, i) => `
+    <div class="stage-flow-step ${i < currentIdx ? 'done' : i === currentIdx ? 'active' : ''}" title="${s.label}"></div>
+  `).join('') + `<span style="font-size:11px; color:var(--text-muted); margin-left:8px; white-space:nowrap;">${STAGES[currentIdx]?.label}</span>`;
+
+  // Stage-specific fields
+  const specific = document.getElementById('stage-specific-fields');
+  specific.innerHTML = '';
+
+  if (p.stage === 'execucao') {
+    specific.innerHTML = `
+      <div class="form-group">
+        <label class="form-label">Bloqueios / obstáculos</label>
+        <textarea class="form-textarea" id="edit-blockers" placeholder="Existe algo impedindo o avanço?">${p.blockers || ''}</textarea>
+      </div>`;
+  }
+  if (p.stage === 'planejamento') {
+    specific.innerHTML = `
+      <div class="form-group">
+        <label class="form-label">Escopo definido</label>
+        <textarea class="form-textarea" id="edit-scope" placeholder="O que está dentro e fora do escopo?">${p.scope || ''}</textarea>
+      </div>`;
+  }
+  if (p.stage === 'entregue') {
+    specific.innerHTML = `
+      <div class="form-group">
+        <label class="form-label">Resultado final / aprendizados</label>
+        <textarea class="form-textarea" id="edit-result" placeholder="O que foi entregue? Quais os aprendizados?">${p.result || ''}</textarea>
+      </div>`;
+  }
+
+  // Stage advance/back buttons
+  specific.innerHTML += `
+    <div style="display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap;">
+      ${currentIdx > 0 ? `<button class="btn btn-ghost btn-sm" onclick="moveStage('${id}', 'back')"><i class="ti ti-arrow-left"></i> Voltar etapa</button>` : ''}
+      ${currentIdx < STAGES.length-1 ? `<button class="btn btn-primary btn-sm" onclick="moveStage('${id}', 'next')">Avançar etapa <i class="ti ti-arrow-right"></i></button>` : ''}
+    </div>`;
+
+  openModal('modal-edit');
+}
+
+function submitEditProject() {
+  if (!editingId) return;
+  const p = DB.getProjects().find(x => x.id === editingId);
+  const updates = {
+    title: document.getElementById('edit-title').value.trim(),
+    problem: document.getElementById('edit-problem').value.trim(),
+    description: document.getElementById('edit-desc').value.trim(),
+    type: document.getElementById('edit-type').value,
+    priority: document.getElementById('edit-priority').value,
+    responsible: document.getElementById('edit-responsible').value.trim(),
+    deadline: document.getElementById('edit-deadline').value,
+    progress: parseInt(document.getElementById('edit-progress').value),
+  };
+  if (document.getElementById('edit-blockers')) updates.blockers = document.getElementById('edit-blockers').value;
+  if (document.getElementById('edit-scope')) updates.scope = document.getElementById('edit-scope').value;
+  if (document.getElementById('edit-result')) updates.result = document.getElementById('edit-result').value;
+
+  updateProject(editingId, updates);
+  closeModal('modal-edit');
+  renderBoard();
+  showToast('Projeto atualizado');
+}
+
+function moveStage(id, direction) {
+  const p = DB.getProjects().find(x => x.id === id);
+  if (!p) return;
+  const newStage = direction === 'next' ? nextStage(p.stage) : prevStage(p.stage);
+  updateProject(id, { stage: newStage, progress: newStage === 'entregue' ? 100 : p.progress });
+  closeModal('modal-edit');
+  renderBoard();
+  showToast(`Movido para: ${STAGES.find(s=>s.id===newStage)?.label}`);
+}
+
+function confirmDelete() {
+  if (!confirm('Excluir este projeto? Esta ação não pode ser desfeita.')) return;
+  deleteProject(editingId);
+  closeModal('modal-edit');
+  renderBoard();
+  updateNavCounts();
+  showToast('Projeto excluído');
+}
+
+// close on overlay click
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) overlay.classList.add('hidden');
+  });
+});
+
+renderBoard();
+</script>
+</body>
+</html>

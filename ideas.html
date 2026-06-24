@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FlowDesk — Banco de Ideias</title>
+  <link rel="stylesheet" href="style.css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css"/>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="wordmark"><div class="dot"></div>FlowDesk</div>
+    <div class="tagline">Gestão de processos</div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-section-label">Menu</div>
+    <a class="nav-item" data-page="index.html" href="index.html">
+      <i class="ti ti-layout-dashboard nav-icon"></i> Dashboard
+    </a>
+    <a class="nav-item" data-page="projects.html" href="projects.html">
+      <i class="ti ti-layout-kanban nav-icon"></i> Projetos
+      <span class="nav-badge" id="nav-projects-count">0</span>
+    </a>
+    <a class="nav-item" data-page="ideas.html" href="ideas.html">
+      <i class="ti ti-bulb nav-icon"></i> Banco de ideias
+      <span class="nav-badge" id="nav-ideas-count">0</span>
+    </a>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="text-muted" style="font-size:11px; padding: 0 10px;">
+      <i class="ti ti-info-circle" style="font-size:12px; vertical-align:-1px;"></i>
+      Piloto v1.0
+    </div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+  <div class="topbar">
+    <div>
+      <div class="topbar-title">Banco de ideias</div>
+      <div class="topbar-sub">Nenhuma ideia se perde</div>
+    </div>
+    <button class="btn btn-primary" onclick="openNewIdeaModal()">
+      <i class="ti ti-plus"></i> Nova ideia
+    </button>
+  </div>
+
+  <div class="page-content">
+
+    <div class="filter-bar">
+      <input type="text" class="form-input" placeholder="Buscar ideia..." id="search-input" oninput="renderIdeas()"/>
+    </div>
+
+    <div id="ideas-container"></div>
+  </div>
+</main>
+
+<!-- MODAL: NEW IDEA -->
+<div class="modal-overlay hidden" id="modal-new-idea">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Nova ideia</div>
+      <button class="modal-close" onclick="closeModal('modal-new-idea')">✕</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Título *</label>
+      <input type="text" class="form-input" id="idea-title" placeholder="Ex: Automatizar envio de relatórios"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Descrição</label>
+      <textarea class="form-textarea" id="idea-desc" placeholder="Qual o problema? Qual a proposta?"></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Categoria</label>
+      <select class="form-select" id="idea-category">
+        <option value="">Selecionar...</option>
+        <option>Processo</option>
+        <option>Melhoria</option>
+        <option>Automação</option>
+        <option>Fluxo</option>
+        <option>Outro</option>
+      </select>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-new-idea')">Cancelar</button>
+      <button class="btn btn-primary" onclick="submitNewIdea()">
+        <i class="ti ti-bulb"></i> Salvar ideia
+      </button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+seedIfEmpty();
+setActiveNav();
+updateNavCounts();
+
+function updateNavCounts() {
+  document.getElementById('nav-projects-count').textContent = DB.getProjects().length;
+  document.getElementById('nav-ideas-count').textContent = DB.getIdeas().length;
+}
+
+function renderIdeas() {
+  const search = document.getElementById('search-input').value.toLowerCase();
+  const ideas = DB.getIdeas().filter(i =>
+    !search || i.title.toLowerCase().includes(search) || i.description?.toLowerCase().includes(search)
+  );
+
+  const container = document.getElementById('ideas-container');
+
+  if (ideas.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state" style="padding: 64px 24px;">
+        <div class="empty-icon">💡</div>
+        <p style="font-size:14px; font-weight:500; margin-bottom:6px; color:var(--text-secondary);">Nenhuma ideia ainda</p>
+        <p>Clique em "Nova ideia" para começar a capturar</p>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = `<div class="ideas-grid" id="ideas-grid"></div>`;
+  const grid = document.getElementById('ideas-grid');
+
+  ideas.forEach(idea => {
+    const card = document.createElement('div');
+    card.className = 'idea-card';
+    card.innerHTML = `
+      <div class="idea-title">${idea.title}</div>
+      ${idea.description ? `<div class="idea-desc">${idea.description}</div>` : ''}
+      <div class="idea-footer">
+        <div style="display:flex; align-items:center; gap:6px;">
+          ${idea.category ? `<span style="font-size:11px; color:var(--text-muted); padding:2px 7px; background:var(--bg-surface); border-radius:4px; border:1px solid var(--border);">${idea.category}</span>` : ''}
+          <span class="text-mono" style="font-size:10px; color:var(--text-muted);">${formatDate(idea.createdAt)}</span>
+        </div>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <button class="idea-promote-btn" onclick="handlePromote('${idea.id}', event)">
+            <i class="ti ti-rocket" style="font-size:10px;"></i> Transformar em projeto
+          </button>
+          <button onclick="handleDeleteIdea('${idea.id}', event)" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:14px; padding:2px 4px;" title="Excluir">
+            <i class="ti ti-x"></i>
+          </button>
+        </div>
+      </div>`;
+    grid.appendChild(card);
+  });
+}
+
+function openNewIdeaModal() {
+  document.getElementById('idea-title').value = '';
+  document.getElementById('idea-desc').value = '';
+  document.getElementById('idea-category').value = '';
+  openModal('modal-new-idea');
+  setTimeout(() => document.getElementById('idea-title').focus(), 100);
+}
+
+function submitNewIdea() {
+  const title = document.getElementById('idea-title').value.trim();
+  if (!title) { document.getElementById('idea-title').focus(); return; }
+  createIdea({
+    title,
+    description: document.getElementById('idea-desc').value.trim(),
+    category: document.getElementById('idea-category').value,
+  });
+  closeModal('modal-new-idea');
+  renderIdeas();
+  updateNavCounts();
+  showToast('Ideia salva no banco');
+}
+
+function handlePromote(id, e) {
+  e.stopPropagation();
+  if (!confirm('Transformar esta ideia em projeto? Ela será movida para o Kanban na etapa Ideia.')) return;
+  promoteIdeaToProject(id);
+  renderIdeas();
+  updateNavCounts();
+  showToast('Ideia promovida a projeto! 🚀');
+}
+
+function handleDeleteIdea(id, e) {
+  e.stopPropagation();
+  if (!confirm('Excluir esta ideia?')) return;
+  deleteIdea(id);
+  renderIdeas();
+  updateNavCounts();
+  showToast('Ideia excluída');
+}
+
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) overlay.classList.add('hidden');
+  });
+});
+
+renderIdeas();
+</script>
+</body>
+</html>

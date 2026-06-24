@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FlowDesk — Dashboard</title>
+  <link rel="stylesheet" href="style.css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css"/>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="wordmark"><div class="dot"></div>FlowDesk</div>
+    <div class="tagline">Gestão de processos</div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-section-label">Menu</div>
+    <a class="nav-item" data-page="index.html" href="index.html">
+      <i class="ti ti-layout-dashboard nav-icon"></i> Dashboard
+    </a>
+    <a class="nav-item" data-page="projects.html" href="projects.html">
+      <i class="ti ti-layout-kanban nav-icon"></i> Projetos
+      <span class="nav-badge" id="nav-projects-count">0</span>
+    </a>
+    <a class="nav-item" data-page="ideas.html" href="ideas.html">
+      <i class="ti ti-bulb nav-icon"></i> Banco de ideias
+      <span class="nav-badge" id="nav-ideas-count">0</span>
+    </a>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="text-muted" style="font-size:11px; padding: 0 10px;">
+      <i class="ti ti-info-circle" style="font-size:12px; vertical-align:-1px;"></i>
+      Piloto v1.0
+    </div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+  <div class="topbar">
+    <div>
+      <div class="topbar-title">Dashboard</div>
+      <div class="topbar-sub">Visão geral dos seus projetos</div>
+    </div>
+    <a href="projects.html" class="btn btn-primary">
+      <i class="ti ti-plus"></i> Novo projeto
+    </a>
+  </div>
+
+  <div class="page-content">
+
+    <!-- METRICS -->
+    <div class="metrics-grid" id="metrics-grid">
+      <!-- preenchido via JS -->
+    </div>
+
+    <!-- TWO COLUMNS -->
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
+
+      <!-- BY STAGE -->
+      <div class="card">
+        <div class="section-heading">
+          <div class="section-title">Projetos por etapa</div>
+        </div>
+        <div id="stage-bars" style="display:flex; flex-direction:column; gap: 10px;"></div>
+      </div>
+
+      <!-- RECENT ACTIVITY -->
+      <div class="card">
+        <div class="section-heading">
+          <div class="section-title">Atualizados recentemente</div>
+        </div>
+        <div id="recent-list" style="display:flex; flex-direction:column; gap: 8px;"></div>
+      </div>
+    </div>
+
+    <!-- HIGH PRIORITY -->
+    <div class="card">
+      <div class="section-heading">
+        <div class="section-title">Atenção necessária</div>
+        <span class="text-muted">Prioridade alta · não entregues</span>
+      </div>
+      <div id="priority-list" style="display:flex; flex-direction:column; gap: 8px;"></div>
+    </div>
+
+  </div>
+</main>
+
+<script src="app.js"></script>
+<script>
+seedIfEmpty();
+setActiveNav();
+
+// Update nav badges
+document.getElementById('nav-projects-count').textContent = DB.getProjects().length;
+document.getElementById('nav-ideas-count').textContent = DB.getIdeas().length;
+
+// ── METRICS ──
+const m = getMetrics();
+const metrics = [
+  { label: 'Total de projetos', value: m.total,      sub: 'cadastrados',         color: 'purple' },
+  { label: 'Entregues',         value: m.delivered,  sub: 'concluídos',          color: 'green'  },
+  { label: 'Em andamento',      value: m.inProgress, sub: 'em execução/diagnóst.', color: 'blue' },
+  { label: 'Pendentes',         value: m.pending,    sub: 'na etapa de ideia',   color: 'amber'  },
+  { label: 'Em revisão',        value: m.review,     sub: 'aguardando ajustes',  color: 'coral'  },
+];
+
+const mg = document.getElementById('metrics-grid');
+metrics.forEach(mt => {
+  mg.innerHTML += `
+    <div class="metric-card ${mt.color}">
+      <div class="metric-label">${mt.label}</div>
+      <div class="metric-value">${String(mt.value).padStart(2,'0')}</div>
+      <div class="metric-sub">${mt.sub}</div>
+    </div>`;
+});
+
+// ── STAGE BARS ──
+const projects = DB.getProjects();
+const stageBars = document.getElementById('stage-bars');
+STAGES.forEach(stage => {
+  const count = projects.filter(p => p.stage === stage.id).length;
+  const pct = m.total > 0 ? Math.round((count / m.total) * 100) : 0;
+  stageBars.innerHTML += `
+    <div>
+      <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+        <span style="font-size:12px; color:var(--text-secondary);">${stage.icon} ${stage.label}</span>
+        <span style="font-size:11px; font-family:var(--mono); color:var(--text-muted);">${count} · ${pct}%</span>
+      </div>
+      <div class="progress-bar" style="height:5px;">
+        <div class="progress-fill" style="width:${pct}%; background:var(--${stage.color === 'blue' ? 'blue' : stage.color === 'teal' ? 'teal' : stage.color === 'amber' ? 'amber' : stage.color === 'coral' ? 'coral' : stage.color === 'green' ? 'green' : 'purple'});"></div>
+      </div>
+    </div>`;
+});
+
+// ── RECENT ──
+const recent = [...projects].sort((a,b) => new Date(b.updatedAt) - new Date(a.updatedAt)).slice(0,5);
+const recentList = document.getElementById('recent-list');
+if (recent.length === 0) {
+  recentList.innerHTML = '<div class="text-muted" style="padding: 12px 0;">Nenhum projeto ainda.</div>';
+} else {
+  recent.forEach(p => {
+    const stage = STAGES.find(s => s.id === p.stage);
+    recentList.innerHTML += `
+      <div style="display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--border);">
+        <span class="stage-badge stage-${p.stage}" style="flex-shrink:0;"><span class="stage-dot"></span>${stage?.label}</span>
+        <span style="font-size:12px; flex:1; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">${p.title}</span>
+        <span class="text-muted" style="flex-shrink:0;">${timeAgo(p.updatedAt)}</span>
+      </div>`;
+  });
+}
+
+// ── PRIORITY ──
+const highPrio = projects.filter(p => p.priority === 'Alta' && p.stage !== 'entregue');
+const prioList = document.getElementById('priority-list');
+if (highPrio.length === 0) {
+  prioList.innerHTML = '<div class="text-muted" style="padding: 12px 0;">Nenhum projeto de prioridade alta no momento. ✓</div>';
+} else {
+  highPrio.forEach(p => {
+    const stage = STAGES.find(s => s.id === p.stage);
+    prioList.innerHTML += `
+      <div style="display:flex; align-items:center; gap:12px; padding:10px 12px; background:var(--bg-surface); border-radius:var(--radius-sm); border:1px solid var(--border);">
+        <i class="ti ti-alert-circle" style="color:var(--coral); font-size:16px; flex-shrink:0;"></i>
+        <div style="flex:1; min-width:0;">
+          <div style="font-size:13px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${p.title}</div>
+          <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">${p.type} · ${stage?.label}</div>
+        </div>
+        <a href="projects.html" class="btn btn-ghost btn-sm">Ver</a>
+      </div>`;
+  });
+}
+</script>
+</body>
+</html>
