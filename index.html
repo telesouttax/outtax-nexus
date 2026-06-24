@@ -3,174 +3,163 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>FlowDesk — Dashboard</title>
+  <title>Nexus — Dashboard</title>
   <link rel="stylesheet" href="style.css"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css"/>
 </head>
 <body>
 
-<!-- SIDEBAR -->
 <aside class="sidebar">
   <div class="sidebar-logo">
-    <div class="wordmark"><div class="dot"></div>FlowDesk</div>
+    <div class="wordmark"><div class="dot"></div>Nexus</div>
     <div class="tagline">Gestão de processos</div>
   </div>
   <nav class="sidebar-nav">
     <div class="nav-section-label">Menu</div>
-    <a class="nav-item" data-page="index.html" href="index.html">
-      <i class="ti ti-layout-dashboard nav-icon"></i> Dashboard
-    </a>
-    <a class="nav-item" data-page="projects.html" href="projects.html">
-      <i class="ti ti-layout-kanban nav-icon"></i> Projetos
-      <span class="nav-badge" id="nav-projects-count">0</span>
-    </a>
-    <a class="nav-item" data-page="ideas.html" href="ideas.html">
-      <i class="ti ti-bulb nav-icon"></i> Banco de ideias
-      <span class="nav-badge" id="nav-ideas-count">0</span>
-    </a>
+    <a class="nav-item" data-page="index.html" href="index.html"><i class="ti ti-layout-dashboard nav-icon"></i> Dashboard</a>
+    <a class="nav-item" data-page="projects.html" href="projects.html"><i class="ti ti-layout-kanban nav-icon"></i> Projetos<span class="nav-badge" id="nav-projects-count">0</span></a>
+    <a class="nav-item" data-page="ideas.html" href="ideas.html"><i class="ti ti-bulb nav-icon"></i> Banco de ideias<span class="nav-badge" id="nav-ideas-count">0</span></a>
   </nav>
   <div class="sidebar-footer">
-    <div class="text-muted" style="font-size:11px; padding: 0 10px;">
-      <i class="ti ti-info-circle" style="font-size:12px; vertical-align:-1px;"></i>
-      Piloto v1.0
+    <button id="fb-login-btn" class="btn btn-primary btn-sm" onclick="fbSignIn()" style="width:100%; justify-content:center; margin-bottom:8px; display:none;">
+      <i class="ti ti-brand-google"></i> Entrar com Google
+    </button>
+    <div id="fb-user-info" style="display:none; align-items:center; gap:8px; padding:8px 10px; background:var(--bg-hover); border-radius:var(--radius-sm); margin-bottom:8px;">
+      <img id="fb-user-avatar" src="" style="width:28px; height:28px; border-radius:50%; object-fit:cover;"/>
+      <div style="flex:1; min-width:0;">
+        <div id="fb-user-name" style="font-size:12px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
+        <div style="font-size:10px; color:var(--text-muted);">conectado</div>
+      </div>
+      <button type="button" onclick="fbSignOut()" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:13px;" title="Sair"><i class="ti ti-logout"></i></button>
+    </div>
+    <div id="drive-connect-wrap">
+      <button id="drive-connect-btn" class="btn btn-ghost btn-sm" style="width:100%; justify-content:center;"><i class="ti ti-brand-google-drive"></i> Conectar Drive</button>
+      <div id="drive-status" style="font-size:10px; color:var(--text-muted); text-align:center; margin-top:4px;">Conecte o Drive para salvar imagens</div>
     </div>
   </div>
 </aside>
 
-<!-- MAIN -->
 <main class="main">
   <div class="topbar">
     <div>
       <div class="topbar-title">Dashboard</div>
-      <div class="topbar-sub">Visão geral dos seus projetos</div>
+      <div class="topbar-sub" id="topbar-sub">Visão geral dos seus projetos</div>
     </div>
-    <a href="projects.html" class="btn btn-primary">
-      <i class="ti ti-plus"></i> Novo projeto
-    </a>
+    <a href="projects.html" class="btn btn-primary"><i class="ti ti-plus"></i> Novo projeto</a>
   </div>
 
   <div class="page-content">
-
-    <!-- METRICS -->
-    <div class="metrics-grid" id="metrics-grid">
-      <!-- preenchido via JS -->
+    <div id="login-banner" style="display:none; background:var(--purple-dim); border:1px solid var(--purple); border-radius:var(--radius-lg); padding:16px 20px; margin-bottom:24px; display:flex; align-items:center; gap:16px;">
+      <i class="ti ti-cloud" style="font-size:24px; color:var(--purple-light);"></i>
+      <div style="flex:1;">
+        <div style="font-size:14px; font-weight:500; color:var(--purple-light);">Entre com Google para sincronizar</div>
+        <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">Seus projetos ficam salvos na nuvem e acessíveis de qualquer lugar</div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="fbSignIn()"><i class="ti ti-brand-google"></i> Entrar</button>
     </div>
 
-    <!-- TWO COLUMNS -->
+    <div class="metrics-grid" id="metrics-grid"></div>
+
     <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
-
-      <!-- BY STAGE -->
       <div class="card">
-        <div class="section-heading">
-          <div class="section-title">Projetos por etapa</div>
-        </div>
-        <div id="stage-bars" style="display:flex; flex-direction:column; gap: 10px;"></div>
+        <div class="section-heading"><div class="section-title">Projetos por etapa</div></div>
+        <div id="stage-bars" style="display:flex; flex-direction:column; gap:10px;"></div>
       </div>
-
-      <!-- RECENT ACTIVITY -->
       <div class="card">
-        <div class="section-heading">
-          <div class="section-title">Atualizados recentemente</div>
-        </div>
-        <div id="recent-list" style="display:flex; flex-direction:column; gap: 8px;"></div>
+        <div class="section-heading"><div class="section-title">Atualizados recentemente</div></div>
+        <div id="recent-list" style="display:flex; flex-direction:column; gap:8px;"></div>
       </div>
     </div>
 
-    <!-- HIGH PRIORITY -->
     <div class="card">
       <div class="section-heading">
         <div class="section-title">Atenção necessária</div>
         <span class="text-muted">Prioridade alta · não entregues</span>
       </div>
-      <div id="priority-list" style="display:flex; flex-direction:column; gap: 8px;"></div>
+      <div id="priority-list" style="display:flex; flex-direction:column; gap:8px;"></div>
     </div>
-
   </div>
 </main>
 
 <script src="app.js"></script>
+<script src="firebase.js"></script>
+<script src="drive.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
-seedIfEmpty();
 setActiveNav();
 
-// Update nav badges
-document.getElementById('nav-projects-count').textContent = DB.getProjects().length;
-document.getElementById('nav-ideas-count').textContent = DB.getIdeas().length;
+async function loadDashboard() {
+  const projects = fbIsSignedIn() ? await fbGetProjects() : DB.getProjects();
 
-// ── METRICS ──
-const m = getMetrics();
-const metrics = [
-  { label: 'Total de projetos', value: m.total,      sub: 'cadastrados',         color: 'purple' },
-  { label: 'Entregues',         value: m.delivered,  sub: 'concluídos',          color: 'green'  },
-  { label: 'Em andamento',      value: m.inProgress, sub: 'em execução/diagnóst.', color: 'blue' },
-  { label: 'Pendentes',         value: m.pending,    sub: 'na etapa de ideia',   color: 'amber'  },
-  { label: 'Em revisão',        value: m.review,     sub: 'aguardando ajustes',  color: 'coral'  },
-];
+  document.getElementById('nav-projects-count').textContent = projects.length;
+  document.getElementById('nav-ideas-count').textContent = (fbIsSignedIn() ? (await fbGetIdeas()) : DB.getIdeas()).length;
 
-const mg = document.getElementById('metrics-grid');
-metrics.forEach(mt => {
-  mg.innerHTML += `
-    <div class="metric-card ${mt.color}">
-      <div class="metric-label">${mt.label}</div>
-      <div class="metric-value">${String(mt.value).padStart(2,'0')}</div>
-      <div class="metric-sub">${mt.sub}</div>
-    </div>`;
-});
+  const m = {
+    total: projects.length,
+    delivered: projects.filter(p => p.stage === 'entregue').length,
+    inProgress: projects.filter(p => ['execucao','planejamento','diagnostico'].includes(p.stage)).length,
+    pending: projects.filter(p => p.stage === 'ideia').length,
+    review: projects.filter(p => p.stage === 'revisao').length,
+  };
 
-// ── STAGE BARS ──
-const projects = DB.getProjects();
-const stageBars = document.getElementById('stage-bars');
-STAGES.forEach(stage => {
-  const count = projects.filter(p => p.stage === stage.id).length;
-  const pct = m.total > 0 ? Math.round((count / m.total) * 100) : 0;
-  stageBars.innerHTML += `
-    <div>
-      <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-        <span style="font-size:12px; color:var(--text-secondary);">${stage.icon} ${stage.label}</span>
-        <span style="font-size:11px; font-family:var(--mono); color:var(--text-muted);">${count} · ${pct}%</span>
-      </div>
-      <div class="progress-bar" style="height:5px;">
-        <div class="progress-fill" style="width:${pct}%; background:var(--${stage.color === 'blue' ? 'blue' : stage.color === 'teal' ? 'teal' : stage.color === 'amber' ? 'amber' : stage.color === 'coral' ? 'coral' : stage.color === 'green' ? 'green' : 'purple'});"></div>
-      </div>
-    </div>`;
-});
+  const metrics = [
+    { label: 'Total de projetos', value: m.total,      sub: 'cadastrados',            color: 'purple' },
+    { label: 'Entregues',         value: m.delivered,  sub: 'concluídos',             color: 'green'  },
+    { label: 'Em andamento',      value: m.inProgress, sub: 'em execução',            color: 'blue'   },
+    { label: 'Pendentes',         value: m.pending,    sub: 'na etapa de ideia',      color: 'amber'  },
+    { label: 'Em revisão',        value: m.review,     sub: 'aguardando ajustes',     color: 'coral'  },
+  ];
 
-// ── RECENT ──
-const recent = [...projects].sort((a,b) => new Date(b.updatedAt) - new Date(a.updatedAt)).slice(0,5);
-const recentList = document.getElementById('recent-list');
-if (recent.length === 0) {
-  recentList.innerHTML = '<div class="text-muted" style="padding: 12px 0;">Nenhum projeto ainda.</div>';
-} else {
+  const mg = document.getElementById('metrics-grid');
+  mg.innerHTML = '';
+  metrics.forEach(mt => {
+    mg.innerHTML += '<div class="metric-card ' + mt.color + '"><div class="metric-label">' + mt.label + '</div><div class="metric-value">' + String(mt.value).padStart(2,'0') + '</div><div class="metric-sub">' + mt.sub + '</div></div>';
+  });
+
+  const stageBars = document.getElementById('stage-bars');
+  stageBars.innerHTML = '';
+  STAGES.forEach(stage => {
+    const count = projects.filter(p => p.stage === stage.id).length;
+    const pct = m.total > 0 ? Math.round((count / m.total) * 100) : 0;
+    const colors = { purple:'var(--purple)', blue:'var(--blue)', teal:'var(--teal)', amber:'var(--amber)', coral:'var(--coral)', green:'var(--green)' };
+    stageBars.innerHTML += '<div><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="font-size:12px;color:var(--text-secondary);">' + stage.icon + ' ' + stage.label + '</span><span style="font-size:11px;font-family:var(--mono);color:var(--text-muted);">' + count + ' · ' + pct + '%</span></div><div class="progress-bar" style="height:5px;"><div class="progress-fill" style="width:' + pct + '%;background:' + (colors[stage.color] || 'var(--purple)') + ';"></div></div></div>';
+  });
+
+  const recent = [...projects].sort((a,b) => new Date(b.updatedAt) - new Date(a.updatedAt)).slice(0,5);
+  const recentList = document.getElementById('recent-list');
+  recentList.innerHTML = recent.length === 0 ? '<div class="text-muted" style="padding:12px 0;">Nenhum projeto ainda.</div>' : '';
   recent.forEach(p => {
     const stage = STAGES.find(s => s.id === p.stage);
-    recentList.innerHTML += `
-      <div style="display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--border);">
-        <span class="stage-badge stage-${p.stage}" style="flex-shrink:0;"><span class="stage-dot"></span>${stage?.label}</span>
-        <span style="font-size:12px; flex:1; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">${p.title}</span>
-        <span class="text-muted" style="flex-shrink:0;">${timeAgo(p.updatedAt)}</span>
-      </div>`;
+    recentList.innerHTML += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);"><span class="stage-badge stage-' + p.stage + '" style="flex-shrink:0;"><span class="stage-dot"></span>' + stage?.label + '</span><span style="font-size:12px;flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">' + p.title + '</span><span class="text-muted" style="flex-shrink:0;">' + timeAgo(p.updatedAt) + '</span></div>';
+  });
+
+  const highPrio = projects.filter(p => p.priority === 'Alta' && p.stage !== 'entregue');
+  const prioList = document.getElementById('priority-list');
+  prioList.innerHTML = highPrio.length === 0 ? '<div class="text-muted" style="padding:12px 0;">Nenhum projeto de prioridade alta no momento. ✓</div>' : '';
+  highPrio.forEach(p => {
+    const stage = STAGES.find(s => s.id === p.stage);
+    prioList.innerHTML += '<div style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--bg-surface);border-radius:var(--radius-sm);border:1px solid var(--border);"><i class="ti ti-alert-circle" style="color:var(--coral);font-size:16px;flex-shrink:0;"></i><div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:500;">' + p.title + '</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px;">' + p.type + ' · ' + stage?.label + '</div></div><a href="projects.html" class="btn btn-ghost btn-sm">Ver</a></div>';
   });
 }
 
-// ── PRIORITY ──
-const highPrio = projects.filter(p => p.priority === 'Alta' && p.stage !== 'entregue');
-const prioList = document.getElementById('priority-list');
-if (highPrio.length === 0) {
-  prioList.innerHTML = '<div class="text-muted" style="padding: 12px 0;">Nenhum projeto de prioridade alta no momento. ✓</div>';
-} else {
-  highPrio.forEach(p => {
-    const stage = STAGES.find(s => s.id === p.stage);
-    prioList.innerHTML += `
-      <div style="display:flex; align-items:center; gap:12px; padding:10px 12px; background:var(--bg-surface); border-radius:var(--radius-sm); border:1px solid var(--border);">
-        <i class="ti ti-alert-circle" style="color:var(--coral); font-size:16px; flex-shrink:0;"></i>
-        <div style="flex:1; min-width:0;">
-          <div style="font-size:13px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${p.title}</div>
-          <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">${p.type} · ${stage?.label}</div>
-        </div>
-        <a href="projects.html" class="btn btn-ghost btn-sm">Ver</a>
-      </div>`;
+// Init
+window.addEventListener('load', async () => {
+  seedIfEmpty();
+  await firebaseInit();
+
+  onAuthChange(async (user) => {
+    if (user) {
+      await migrateLocalToFirebase();
+      document.getElementById('login-banner').style.display = 'none';
+    } else {
+      document.getElementById('login-banner').style.display = 'flex';
+    }
+    await loadDashboard();
   });
-}
+
+  setTimeout(() => driveInit(), 800);
+  await loadDashboard();
+});
 </script>
 </body>
 </html>
