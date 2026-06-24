@@ -189,6 +189,16 @@
       </div>
     </div>
 
+    <!-- IMAGES -->
+    <div class="form-group">
+      <label class="form-label">Imagens e anexos</label>
+      <div id="edit-images-grid" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px;"></div>
+      <label style="display:inline-flex; align-items:center; gap:6px; padding:7px 14px; background:var(--bg-surface); border:1px dashed var(--border-light); border-radius:var(--radius-sm); cursor:pointer; font-size:12px; color:var(--text-secondary); transition:all 0.15s;">
+        <i class="ti ti-upload" style="font-size:14px;"></i> Adicionar imagem
+        <input type="file" accept="image/*" multiple style="display:none;" id="edit-image-input" onchange="handleImageUpload(event)"/>
+      </label>
+    </div>
+
     <div class="form-actions" style="justify-content:space-between;">
       <button class="btn btn-ghost" style="color:var(--coral); border-color:rgba(248,113,113,0.3);" onclick="confirmDelete()">
         <i class="ti ti-trash"></i> Excluir
@@ -261,7 +271,8 @@ function renderBoard() {
           <span style="font-size:10px; color:var(--text-muted); padding:2px 6px; background:var(--bg-surface); border-radius:4px; border:1px solid var(--border);">${p.type}</span>
           ${p.deadline ? `<span class="card-date"><i class="ti ti-calendar" style="font-size:10px;"></i> ${formatDate(p.deadline)}</span>` : `<span class="card-date">${timeAgo(p.updatedAt)}</span>`}
         </div>
-        ${p.progress > 0 ? `<div class="progress-bar"><div class="progress-fill" style="width:${p.progress}%"></div></div>` : ''}`;
+        ${p.progress > 0 ? `<div class="progress-bar"><div class="progress-fill" style="width:${p.progress}%"></div></div>` : ''}
+        ${p.images?.length > 0 ? `<div style="margin-top:8px; display:flex; gap:4px; flex-wrap:wrap;">${p.images.slice(0,3).map(img => `<img src="${img.base64}" style="width:36px; height:36px; object-fit:cover; border-radius:4px; border:1px solid var(--border);">`).join('')}${p.images.length > 3 ? `<div style="width:36px; height:36px; border-radius:4px; background:var(--bg-surface); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:10px; color:var(--text-muted);">+${p.images.length-3}</div>` : ''}</div>` : ''}`;
       body.appendChild(card);
     });
   });
@@ -354,6 +365,37 @@ function openEditModal(id) {
     </div>`;
 
   openModal('modal-edit');
+  setTimeout(() => renderEditImages(p), 50);
+  const grid = document.getElementById('edit-images-grid');
+  if (!grid) return;
+  const images = p.images || [];
+  grid.innerHTML = images.map(img => `
+    <div style="position:relative; width:72px; height:72px; border-radius:var(--radius-sm); overflow:hidden; border:1px solid var(--border);">
+      <img src="${img.base64}" style="width:100%; height:100%; object-fit:cover;" title="${img.name}"/>
+      <button onclick="handleRemoveImage('${img.id}')" style="position:absolute; top:2px; right:2px; background:rgba(0,0,0,0.6); border:none; color:#fff; border-radius:50%; width:18px; height:18px; font-size:10px; cursor:pointer; display:flex; align-items:center; justify-content:center; line-height:1;">✕</button>
+    </div>`).join('');
+}
+
+async function handleImageUpload(event) {
+  const files = Array.from(event.target.files);
+  if (!editingId || files.length === 0) return;
+  for (const file of files) {
+    if (file.size > 3 * 1024 * 1024) { showToast('Imagem muito grande (máx 3MB)'); continue; }
+    const base64 = await readFileAsBase64(file);
+    addImageToProject(editingId, base64, file.name);
+  }
+  const p = DB.getProjects().find(x => x.id === editingId);
+  renderEditImages(p);
+  event.target.value = '';
+  showToast('Imagem adicionada');
+}
+
+function handleRemoveImage(imgId) {
+  if (!editingId) return;
+  removeImageFromProject(editingId, imgId);
+  const p = DB.getProjects().find(x => x.id === editingId);
+  renderEditImages(p);
+  showToast('Imagem removida');
 }
 
 function submitEditProject() {
