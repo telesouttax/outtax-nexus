@@ -298,8 +298,8 @@ function renderBoard() {
   const typeFilter = document.getElementById('filter-type').value;
   const prioFilter = document.getElementById('filter-priority').value;
 
-  let projects = DB.getProjects().filter(p => {
-    if (search && !p.title.toLowerCase().includes(search) && !p.description?.toLowerCase().includes(search)) return false;
+  const projects = DB.getProjects().filter(p => {
+    if (search && !p.title.toLowerCase().includes(search) && !(p.description || '').toLowerCase().includes(search)) return false;
     if (typeFilter && p.type !== typeFilter) return false;
     if (prioFilter && p.priority !== prioFilter) return false;
     return true;
@@ -310,59 +310,105 @@ function renderBoard() {
 
   STAGES.forEach(stage => {
     const stageProjects = projects.filter(p => p.stage === stage.id);
+
     const col = document.createElement('div');
     col.className = 'kanban-column';
-    col.innerHTML = `
-      <div class="kanban-header">
-        <div class="col-title">
-          <span class="stage-badge stage-${stage.id}"><span class="stage-dot"></span>${stage.label}</span>
-        </div>
-        <span class="col-count">${stageProjects.length}</span>
-      </div>
-      <div class="kanban-body" id="col-${stage.id}">
-        ${stageProjects.length === 0 ? `<div class="empty-state" style="padding:24px 12px;"><div class="empty-icon" style="font-size:20px;">${stage.icon}</div><p style="font-size:11px;">Nenhum projeto aqui</p></div>` : ''}
-      </div>`;
-    board.appendChild(col);
 
-    const body = document.getElementById(`col-${stage.id}`);
-    stageProjects.forEach(p => {
-      const images = p.images || [];
+    const header = document.createElement('div');
+    header.className = 'kanban-header';
+    header.innerHTML = '<div class="col-title"><span class="stage-badge stage-' + stage.id + '"><span class="stage-dot"></span>' + stage.label + '</span></div><span class="col-count">' + stageProjects.length + '</span>';
+    col.appendChild(header);
+
+    const body = document.createElement('div');
+    body.className = 'kanban-body';
+    body.id = 'col-' + stage.id;
+
+    if (stageProjects.length === 0) {
+      body.innerHTML = '<div class="empty-state" style="padding:24px 12px;"><div class="empty-icon" style="font-size:20px;">' + stage.icon + '</div><p style="font-size:11px;">Nenhum projeto aqui</p></div>';
+    }
+
+    stageProjects.forEach(function(p) {
       const card = document.createElement('div');
       card.className = 'project-card';
-      card.onclick = () => openEditModal(p.id);
-      card.innerHTML = `
-        <div class="card-title">${p.title}</div>
-        ${p.description ? `<div class="card-desc">${p.description}</div>` : ''}
-        <div class="card-meta">
-          <span class="priority-badge priority-${p.priority.toLowerCase()}">${p.priority}</span>
-          <span style="font-size:10px; color:var(--text-muted); padding:2px 6px; background:var(--bg-surface); border-radius:4px; border:1px solid var(--border);">${p.type}</span>
-          ${p.deadline ? `<span class="card-date"><i class="ti ti-calendar" style="font-size:10px;"></i> ${formatDate(p.deadline)}</span>` : `<span class="card-date">${timeAgo(p.updatedAt)}</span>`}
-        </div>
-        ${p.progress > 0 ? `<div class="progress-bar"><div class="progress-fill" style="width:${p.progress}%"></div></div>` : ''}
-        ${(p.checklist && p.checklist.length > 0) ? (() => {
-          const done = p.checklist.filter(i => i.done).length;
-          const total = p.checklist.length;
-          return `<div style="margin-top:6px; display:flex; align-items:center; gap:6px;">
-            <i class="ti ti-checklist" style="font-size:11px; color:var(--text-muted);"></i>
-            <span style="font-size:10px; color:var(--text-muted); font-family:var(--mono);">${done}/${total}</span>
-            <div style="flex:1; height:3px; background:var(--border); border-radius:2px; overflow:hidden;">
-              <div style="height:100%; width:${Math.round(done/total*100)}%; background:${done===total ? 'var(--green)' : 'var(--purple)'}; border-radius:2px;"></div>
-            </div>
-          </div>`;
-        })() : ''}
-        ${images.length > 0 ? `
-          <div style="margin-top:8px; display:flex; gap:4px; flex-wrap:wrap;">
-            ${images.slice(0,3).map(img => `
-              <img src="${img.thumbnailUrl || img.base64 || ''}" 
-                style="width:36px; height:36px; object-fit:cover; border-radius:4px; border:1px solid var(--border);"
-                onerror="this.style.display='none'">`).join('')}
-            ${images.length > 3 ? `<div style="width:36px; height:36px; border-radius:4px; background:var(--bg-surface); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:10px; color:var(--text-muted);">+${images.length-3}</div>` : ''}
-            <span style="font-size:10px; color:var(--text-muted); align-self:center; margin-left:2px;">
-              <i class="ti ti-brand-google-drive" style="font-size:11px; vertical-align:-1px;"></i> ${images.length} imagem${images.length > 1 ? 's' : ''}
-            </span>
-          </div>` : ''}`;
+      card.onclick = function() { openEditModal(p.id); };
+
+      // Title
+      const titleEl = document.createElement('div');
+      titleEl.className = 'card-title';
+      titleEl.textContent = p.title;
+      card.appendChild(titleEl);
+
+      // Description
+      if (p.description) {
+        const descEl = document.createElement('div');
+        descEl.className = 'card-desc';
+        descEl.textContent = p.description;
+        card.appendChild(descEl);
+      }
+
+      // Meta row
+      const meta = document.createElement('div');
+      meta.className = 'card-meta';
+      meta.innerHTML = '<span class="priority-badge priority-' + (p.priority || 'media').toLowerCase() + '">' + (p.priority || 'Média') + '</span>'
+        + '<span style="font-size:10px;color:var(--text-muted);padding:2px 6px;background:var(--bg-surface);border-radius:4px;border:1px solid var(--border);">' + (p.type || 'Processo') + '</span>'
+        + (p.deadline
+          ? '<span class="card-date"><i class="ti ti-calendar" style="font-size:10px;"></i> ' + formatDate(p.deadline) + '</span>'
+          : '<span class="card-date">' + timeAgo(p.updatedAt) + '</span>');
+      card.appendChild(meta);
+
+      // Progress bar
+      if (p.progress > 0) {
+        const bar = document.createElement('div');
+        bar.className = 'progress-bar';
+        bar.innerHTML = '<div class="progress-fill" style="width:' + p.progress + '%"></div>';
+        card.appendChild(bar);
+      }
+
+      // Checklist preview
+      const checklist = p.checklist || [];
+      if (checklist.length > 0) {
+        const done = checklist.filter(function(i) { return i.done; }).length;
+        const total = checklist.length;
+        const pct = Math.round(done / total * 100);
+        const ckRow = document.createElement('div');
+        ckRow.style.cssText = 'margin-top:6px;display:flex;align-items:center;gap:6px;';
+        ckRow.innerHTML = '<i class="ti ti-checklist" style="font-size:11px;color:var(--text-muted);"></i>'
+          + '<span style="font-size:10px;color:var(--text-muted);font-family:var(--mono);">' + done + '/' + total + '</span>'
+          + '<div style="flex:1;height:3px;background:var(--border);border-radius:2px;overflow:hidden;">'
+          + '<div style="height:100%;width:' + pct + '%;background:' + (done === total ? 'var(--green)' : 'var(--purple)') + ';border-radius:2px;"></div></div>';
+        card.appendChild(ckRow);
+      }
+
+      // Images preview
+      const images = p.images || [];
+      if (images.length > 0) {
+        const imgRow = document.createElement('div');
+        imgRow.style.cssText = 'margin-top:8px;display:flex;gap:4px;flex-wrap:wrap;align-items:center;';
+        images.slice(0, 3).forEach(function(img) {
+          const im = document.createElement('img');
+          im.src = img.thumbnailUrl || img.base64 || '';
+          im.style.cssText = 'width:36px;height:36px;object-fit:cover;border-radius:4px;border:1px solid var(--border);';
+          im.onerror = function() { this.style.display = 'none'; };
+          imgRow.appendChild(im);
+        });
+        if (images.length > 3) {
+          const more = document.createElement('div');
+          more.style.cssText = 'width:36px;height:36px;border-radius:4px;background:var(--bg-surface);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--text-muted);';
+          more.textContent = '+' + (images.length - 3);
+          imgRow.appendChild(more);
+        }
+        const driveLabel = document.createElement('span');
+        driveLabel.style.cssText = 'font-size:10px;color:var(--text-muted);';
+        driveLabel.innerHTML = '<i class="ti ti-brand-google-drive" style="font-size:11px;vertical-align:-1px;"></i> ' + images.length + ' imagem' + (images.length > 1 ? 's' : '');
+        imgRow.appendChild(driveLabel);
+        card.appendChild(imgRow);
+      }
+
       body.appendChild(card);
     });
+
+    col.appendChild(body);
+    board.appendChild(col);
   });
 }
 
