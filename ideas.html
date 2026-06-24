@@ -3,58 +3,55 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>FlowDesk — Banco de Ideias</title>
+  <title>Nexus — Banco de Ideias</title>
   <link rel="stylesheet" href="style.css"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css"/>
 </head>
 <body>
 
-<!-- SIDEBAR -->
 <aside class="sidebar">
   <div class="sidebar-logo">
-    <div class="wordmark"><div class="dot"></div>FlowDesk</div>
+    <div class="wordmark"><div class="dot"></div>Nexus</div>
     <div class="tagline">Gestão de processos</div>
   </div>
   <nav class="sidebar-nav">
     <div class="nav-section-label">Menu</div>
-    <a class="nav-item" data-page="index.html" href="index.html">
-      <i class="ti ti-layout-dashboard nav-icon"></i> Dashboard
-    </a>
-    <a class="nav-item" data-page="projects.html" href="projects.html">
-      <i class="ti ti-layout-kanban nav-icon"></i> Projetos
-      <span class="nav-badge" id="nav-projects-count">0</span>
-    </a>
-    <a class="nav-item" data-page="ideas.html" href="ideas.html">
-      <i class="ti ti-bulb nav-icon"></i> Banco de ideias
-      <span class="nav-badge" id="nav-ideas-count">0</span>
-    </a>
+    <a class="nav-item" data-page="index.html" href="index.html"><i class="ti ti-layout-dashboard nav-icon"></i> Dashboard</a>
+    <a class="nav-item" data-page="projects.html" href="projects.html"><i class="ti ti-layout-kanban nav-icon"></i> Projetos<span class="nav-badge" id="nav-projects-count">0</span></a>
+    <a class="nav-item" data-page="ideas.html" href="ideas.html"><i class="ti ti-bulb nav-icon"></i> Banco de ideias<span class="nav-badge" id="nav-ideas-count">0</span></a>
   </nav>
   <div class="sidebar-footer">
-    <div class="text-muted" style="font-size:11px; padding: 0 10px;">
-      <i class="ti ti-info-circle" style="font-size:12px; vertical-align:-1px;"></i>
-      Piloto v1.0
+    <div style="padding:0 10px; display:flex; flex-direction:column; gap:8px;">
+      <button id="fb-login-btn" class="btn btn-primary btn-sm" onclick="fbSignIn()" style="width:100%; justify-content:center; display:none;">
+        <i class="ti ti-brand-google"></i> Entrar com Google
+      </button>
+      <div id="fb-user-info" style="display:none; align-items:center; gap:8px; padding:8px 10px; background:var(--bg-hover); border-radius:var(--radius-sm);">
+        <img id="fb-user-avatar" src="" style="width:28px; height:28px; border-radius:50%; object-fit:cover;"/>
+        <div style="flex:1; min-width:0;">
+          <div id="fb-user-name" style="font-size:12px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
+          <div style="font-size:10px; color:var(--text-muted);">conectado</div>
+        </div>
+        <button type="button" onclick="fbSignOut()" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:13px;" title="Sair"><i class="ti ti-logout"></i></button>
+      </div>
     </div>
   </div>
 </aside>
 
-<!-- MAIN -->
 <main class="main">
   <div class="topbar">
     <div>
       <div class="topbar-title">Banco de ideias</div>
       <div class="topbar-sub">Nenhuma ideia se perde</div>
     </div>
-    <button class="btn btn-primary" onclick="openNewIdeaModal()">
+    <button type="button" class="btn btn-primary" onclick="openNewIdeaModal()">
       <i class="ti ti-plus"></i> Nova ideia
     </button>
   </div>
 
   <div class="page-content">
-
     <div class="filter-bar">
       <input type="text" class="form-input" placeholder="Buscar ideia..." id="search-input" oninput="renderIdeas()"/>
     </div>
-
     <div id="ideas-container"></div>
   </div>
 </main>
@@ -64,7 +61,7 @@
   <div class="modal">
     <div class="modal-header">
       <div class="modal-title">Nova ideia</div>
-      <button class="modal-close" onclick="closeModal('modal-new-idea')">✕</button>
+      <button type="button" class="modal-close" onclick="closeModal('modal-new-idea')">✕</button>
     </div>
     <div class="form-group">
       <label class="form-label">Título *</label>
@@ -78,16 +75,12 @@
       <label class="form-label">Categoria</label>
       <select class="form-select" id="idea-category">
         <option value="">Selecionar...</option>
-        <option>Processo</option>
-        <option>Melhoria</option>
-        <option>Automação</option>
-        <option>Fluxo</option>
-        <option>Outro</option>
+        <option>Processo</option><option>Melhoria</option><option>Automação</option><option>Fluxo</option><option>Outro</option>
       </select>
     </div>
     <div class="form-actions">
-      <button class="btn btn-ghost" onclick="closeModal('modal-new-idea')">Cancelar</button>
-      <button class="btn btn-primary" onclick="submitNewIdea()">
+      <button type="button" class="btn btn-ghost" onclick="closeModal('modal-new-idea')">Cancelar</button>
+      <button type="button" class="btn btn-primary" onclick="submitNewIdea()">
         <i class="ti ti-bulb"></i> Salvar ideia
       </button>
     </div>
@@ -95,57 +88,54 @@
 </div>
 
 <script src="app.js"></script>
+<script src="firebase.js"></script>
 <script>
 seedIfEmpty();
 setActiveNav();
-updateNavCounts();
 
-function updateNavCounts() {
-  document.getElementById('nav-projects-count').textContent = DB.getProjects().length;
-  document.getElementById('nav-ideas-count').textContent = DB.getIdeas().length;
+let allIdeas = [];
+
+async function updateNavCounts() {
+  const projects = fbIsSignedIn() ? await fbGetProjects() : DB.getProjects();
+  document.getElementById('nav-projects-count').textContent = projects.length;
+  document.getElementById('nav-ideas-count').textContent = allIdeas.length;
+}
+
+async function refreshIdeas() {
+  allIdeas = fbIsSignedIn() ? await fbGetIdeas() : DB.getIdeas();
+  renderIdeas();
 }
 
 function renderIdeas() {
   const search = document.getElementById('search-input').value.toLowerCase();
-  const ideas = DB.getIdeas().filter(i =>
-    !search || i.title.toLowerCase().includes(search) || i.description?.toLowerCase().includes(search)
+  const ideas = allIdeas.filter(i =>
+    !search || i.title.toLowerCase().includes(search) || (i.description || '').toLowerCase().includes(search)
   );
 
   const container = document.getElementById('ideas-container');
 
   if (ideas.length === 0) {
-    container.innerHTML = `
-      <div class="empty-state" style="padding: 64px 24px;">
-        <div class="empty-icon">💡</div>
-        <p style="font-size:14px; font-weight:500; margin-bottom:6px; color:var(--text-secondary);">Nenhuma ideia ainda</p>
-        <p>Clique em "Nova ideia" para começar a capturar</p>
-      </div>`;
+    container.innerHTML = '<div class="empty-state" style="padding:64px 24px;"><div class="empty-icon">💡</div><p style="font-size:14px;font-weight:500;margin-bottom:6px;color:var(--text-secondary);">Nenhuma ideia ainda</p><p>Clique em "Nova ideia" para começar</p></div>';
     return;
   }
 
-  container.innerHTML = `<div class="ideas-grid" id="ideas-grid"></div>`;
+  container.innerHTML = '<div class="ideas-grid" id="ideas-grid"></div>';
   const grid = document.getElementById('ideas-grid');
 
   ideas.forEach(idea => {
     const card = document.createElement('div');
     card.className = 'idea-card';
-    card.innerHTML = `
-      <div class="idea-title">${idea.title}</div>
-      ${idea.description ? `<div class="idea-desc">${idea.description}</div>` : ''}
-      <div class="idea-footer">
-        <div style="display:flex; align-items:center; gap:6px;">
-          ${idea.category ? `<span style="font-size:11px; color:var(--text-muted); padding:2px 7px; background:var(--bg-surface); border-radius:4px; border:1px solid var(--border);">${idea.category}</span>` : ''}
-          <span class="text-mono" style="font-size:10px; color:var(--text-muted);">${formatDate(idea.createdAt)}</span>
-        </div>
-        <div style="display:flex; gap:6px; align-items:center;">
-          <button class="idea-promote-btn" onclick="handlePromote('${idea.id}', event)">
-            <i class="ti ti-rocket" style="font-size:10px;"></i> Transformar em projeto
-          </button>
-          <button onclick="handleDeleteIdea('${idea.id}', event)" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:14px; padding:2px 4px;" title="Excluir">
-            <i class="ti ti-x"></i>
-          </button>
-        </div>
-      </div>`;
+    card.innerHTML = '<div class="idea-title">' + idea.title + '</div>'
+      + (idea.description ? '<div class="idea-desc">' + idea.description + '</div>' : '')
+      + '<div class="idea-footer">'
+      + '<div style="display:flex;align-items:center;gap:6px;">'
+      + (idea.category ? '<span style="font-size:11px;color:var(--text-muted);padding:2px 7px;background:var(--bg-surface);border-radius:4px;border:1px solid var(--border);">' + idea.category + '</span>' : '')
+      + '<span style="font-size:10px;color:var(--text-muted);font-family:var(--mono);">' + formatDate(idea.createdAt) + '</span>'
+      + '</div>'
+      + '<div style="display:flex;gap:6px;align-items:center;">'
+      + '<button class="idea-promote-btn" onclick="handlePromote(\'' + idea.id + '\', event)"><i class="ti ti-rocket" style="font-size:10px;"></i> Transformar em projeto</button>'
+      + '<button type="button" onclick="handleDeleteIdea(\'' + idea.id + '\', event)" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:14px;padding:2px 4px;" title="Excluir"><i class="ti ti-x"></i></button>'
+      + '</div></div>';
     grid.appendChild(card);
   });
 }
@@ -158,45 +148,60 @@ function openNewIdeaModal() {
   setTimeout(() => document.getElementById('idea-title').focus(), 100);
 }
 
-function submitNewIdea() {
+async function submitNewIdea() {
   const title = document.getElementById('idea-title').value.trim();
   if (!title) { document.getElementById('idea-title').focus(); return; }
-  createIdea({
+  const idea = createIdea({
     title,
     description: document.getElementById('idea-desc').value.trim(),
     category: document.getElementById('idea-category').value,
   });
+  if (fbIsSignedIn()) await fbSaveIdea(idea);
   closeModal('modal-new-idea');
-  renderIdeas();
+  await refreshIdeas();
   updateNavCounts();
-  showToast('Ideia salva no banco');
+  showToast('Ideia salva!');
 }
 
-function handlePromote(id, e) {
+async function handlePromote(id, e) {
   e.stopPropagation();
-  if (!confirm('Transformar esta ideia em projeto? Ela será movida para o Kanban na etapa Ideia.')) return;
-  promoteIdeaToProject(id);
-  renderIdeas();
+  if (!confirm('Transformar esta ideia em projeto? Ela será movida para o Kanban.')) return;
+  const idea = allIdeas.find(i => i.id === id);
+  if (!idea) return;
+  const project = createProject({ title: idea.title, description: idea.description, stage: 'ideia' });
+  if (fbIsSignedIn()) {
+    await fbSaveProject(project);
+    await fbDeleteIdea(id);
+  }
+  deleteIdea(id);
+  await refreshIdeas();
   updateNavCounts();
   showToast('Ideia promovida a projeto! 🚀');
 }
 
-function handleDeleteIdea(id, e) {
+async function handleDeleteIdea(id, e) {
   e.stopPropagation();
   if (!confirm('Excluir esta ideia?')) return;
   deleteIdea(id);
-  renderIdeas();
+  if (fbIsSignedIn()) await fbDeleteIdea(id);
+  await refreshIdeas();
   updateNavCounts();
   showToast('Ideia excluída');
 }
 
 document.querySelectorAll('.modal-overlay').forEach(overlay => {
-  overlay.addEventListener('click', e => {
-    if (e.target === overlay) overlay.classList.add('hidden');
-  });
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.add('hidden'); });
 });
 
-renderIdeas();
+window.addEventListener('load', async () => {
+  await firebaseInit();
+  onAuthChange(async (user) => {
+    if (user) await migrateLocalToFirebase();
+    await refreshIdeas();
+    updateNavCounts();
+  });
+  await refreshIdeas();
+});
 </script>
 </body>
 </html>
