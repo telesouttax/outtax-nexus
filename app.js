@@ -159,7 +159,43 @@ function showToast(message) {
   setTimeout(() => toast.classList.remove('show'), 2800);
 }
 
-// ── IMAGE HELPERS ──
+// ── CHECKLIST ──
+function addChecklistItem(projectId, text) {
+  const p = DB.getProjects().find(x => x.id === projectId);
+  if (!p || !text.trim()) return;
+  const checklist = p.checklist || [];
+  checklist.push({ id: 'ck_' + Date.now(), text: text.trim(), done: false, createdAt: new Date().toISOString() });
+  updateProject(projectId, { checklist });
+  autoUpdateProgress(projectId);
+}
+
+function toggleChecklistItem(projectId, itemId) {
+  const p = DB.getProjects().find(x => x.id === projectId);
+  if (!p) return;
+  const checklist = (p.checklist || []).map(item =>
+    item.id === itemId ? { ...item, done: !item.done } : item
+  );
+  updateProject(projectId, { checklist });
+  autoUpdateProgress(projectId);
+}
+
+function deleteChecklistItem(projectId, itemId) {
+  const p = DB.getProjects().find(x => x.id === projectId);
+  if (!p) return;
+  const checklist = (p.checklist || []).filter(i => i.id !== itemId);
+  updateProject(projectId, { checklist });
+  autoUpdateProgress(projectId);
+}
+
+function autoUpdateProgress(projectId) {
+  const p = DB.getProjects().find(x => x.id === projectId);
+  if (!p || !p.checklist || p.checklist.length === 0) return;
+  const done = p.checklist.filter(i => i.done).length;
+  const progress = Math.round((done / p.checklist.length) * 100);
+  updateProject(projectId, { progress });
+}
+
+
 function addImageToProject(projectId, base64, name, imageObj) {
   const p = DB.getProjects().find(x => x.id === projectId);
   if (!p) return;
@@ -211,6 +247,12 @@ function seedIfEmpty() {
       type: 'Automação', priority: 'Alta', stage: 'execucao', progress: 60,
       problem: 'Processo manual e repetitivo consome tempo valioso',
       responsible: 'Você', deadline: '2025-02-28',
+      checklist: [
+        { id: 'ck_s1', text: 'Mapear campos do relatório atual', done: true, createdAt: new Date().toISOString() },
+        { id: 'ck_s2', text: 'Criar template na planilha', done: true, createdAt: new Date().toISOString() },
+        { id: 'ck_s3', text: 'Testar com o time', done: false, createdAt: new Date().toISOString() },
+        { id: 'ck_s4', text: 'Validar com gestor', done: false, createdAt: new Date().toISOString() },
+      ],
     },
     {
       title: 'Padronizar nomenclatura de arquivos',
