@@ -175,6 +175,22 @@
       </div>
     </div>
 
+    <!-- CHECKLIST SECTION -->
+    <div class="form-group">
+      <label class="form-label" style="display:flex; align-items:center; justify-content:space-between;">
+        <span>Checklist de tarefas</span>
+        <span id="checklist-summary" style="font-size:11px; color:var(--text-muted); font-family:var(--mono);"></span>
+      </label>
+      <div id="checklist-items" style="display:flex; flex-direction:column; gap:4px; margin-bottom:10px;"></div>
+      <div style="display:flex; gap:8px;">
+        <input type="text" class="form-input" id="checklist-new-input" placeholder="Nova tarefa..." style="flex:1;"
+          onkeydown="if(event.key==='Enter'){addChecklistItemUI();event.preventDefault();}"/>
+        <button class="btn btn-ghost btn-sm" onclick="addChecklistItemUI()">
+          <i class="ti ti-plus"></i>
+        </button>
+      </div>
+    </div>
+
     <!-- IMAGES SECTION -->
     <div class="form-group">
       <label class="form-label" style="display:flex; align-items:center; justify-content:space-between;">
@@ -307,6 +323,17 @@ function renderBoard() {
           ${p.deadline ? `<span class="card-date"><i class="ti ti-calendar" style="font-size:10px;"></i> ${formatDate(p.deadline)}</span>` : `<span class="card-date">${timeAgo(p.updatedAt)}</span>`}
         </div>
         ${p.progress > 0 ? `<div class="progress-bar"><div class="progress-fill" style="width:${p.progress}%"></div></div>` : ''}
+        ${(p.checklist && p.checklist.length > 0) ? (() => {
+          const done = p.checklist.filter(i => i.done).length;
+          const total = p.checklist.length;
+          return `<div style="margin-top:6px; display:flex; align-items:center; gap:6px;">
+            <i class="ti ti-checklist" style="font-size:11px; color:var(--text-muted);"></i>
+            <span style="font-size:10px; color:var(--text-muted); font-family:var(--mono);">${done}/${total}</span>
+            <div style="flex:1; height:3px; background:var(--border); border-radius:2px; overflow:hidden;">
+              <div style="height:100%; width:${Math.round(done/total*100)}%; background:${done===total ? 'var(--green)' : 'var(--purple)'}; border-radius:2px;"></div>
+            </div>
+          </div>`;
+        })() : ''}
         ${images.length > 0 ? `
           <div style="margin-top:8px; display:flex; gap:4px; flex-wrap:wrap;">
             ${images.slice(0,3).map(img => `
@@ -393,6 +420,7 @@ function openEditModal(id) {
     </div>`;
 
   updateUploadUI();
+  renderChecklist(p);
   renderEditImages(p);
   openModal('modal-edit');
 }
@@ -435,6 +463,71 @@ function confirmDelete() {
   renderBoard();
   updateNavCounts();
   showToast('Projeto excluído');
+}
+
+// ── CHECKLIST UI ──
+function renderChecklist(p) {
+  const container = document.getElementById('checklist-items');
+  const summary = document.getElementById('checklist-summary');
+  if (!container) return;
+  const items = p.checklist || [];
+  const done = items.filter(i => i.done).length;
+
+  if (summary) {
+    summary.textContent = items.length > 0 ? `${done}/${items.length} concluídas` : '';
+  }
+
+  if (items.length === 0) {
+    container.innerHTML = `<div style="font-size:12px; color:var(--text-muted); padding:4px 0;">Nenhuma tarefa ainda. Adicione abaixo.</div>`;
+    return;
+  }
+
+  container.innerHTML = items.map(item => `
+    <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; background:var(--bg-surface); border-radius:var(--radius-sm); border:1px solid var(--border); group;" id="ck-row-${item.id}">
+      <button onclick="handleToggleCheck('${item.id}')" style="flex-shrink:0; width:18px; height:18px; border-radius:4px; border:1.5px solid ${item.done ? 'var(--purple)' : 'var(--border-light)'}; background:${item.done ? 'var(--purple)' : 'transparent'}; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.15s;">
+        ${item.done ? '<i class="ti ti-check" style="font-size:11px; color:#fff;"></i>' : ''}
+      </button>
+      <span style="flex:1; font-size:13px; ${item.done ? 'text-decoration:line-through; color:var(--text-muted);' : 'color:var(--text-primary);'}">${item.text}</span>
+      <button onclick="handleDeleteCheck('${item.id}')" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:13px; padding:2px 4px; opacity:0.5; transition:opacity 0.15s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.5'">
+        <i class="ti ti-x"></i>
+      </button>
+    </div>`).join('');
+
+  // Update progress slider to match
+  const progress = items.length > 0 ? Math.round((done / items.length) * 100) : 0;
+  const slider = document.getElementById('edit-progress');
+  const val = document.getElementById('edit-progress-val');
+  if (slider && items.length > 0) {
+    slider.value = progress;
+    if (val) val.textContent = progress + '%';
+  }
+}
+
+function addChecklistItemUI() {
+  const input = document.getElementById('checklist-new-input');
+  const text = input?.value.trim();
+  if (!text || !editingId) return;
+  addChecklistItem(editingId, text);
+  input.value = '';
+  const p = DB.getProjects().find(x => x.id === editingId);
+  renderChecklist(p);
+  renderBoard();
+}
+
+function handleToggleCheck(itemId) {
+  if (!editingId) return;
+  toggleChecklistItem(editingId, itemId);
+  const p = DB.getProjects().find(x => x.id === editingId);
+  renderChecklist(p);
+  renderBoard();
+}
+
+function handleDeleteCheck(itemId) {
+  if (!editingId) return;
+  deleteChecklistItem(editingId, itemId);
+  const p = DB.getProjects().find(x => x.id === editingId);
+  renderChecklist(p);
+  renderBoard();
 }
 
 // ── IMAGE RENDERING ──
