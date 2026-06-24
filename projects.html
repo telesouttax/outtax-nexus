@@ -53,26 +53,46 @@
   <div class="topbar">
     <div>
       <div class="topbar-title">Projetos</div>
-      <div class="topbar-sub">Fluxo de etapas</div>
+      <div class="topbar-sub" id="view-sub">Fluxo de etapas</div>
     </div>
-    <button class="btn btn-primary" onclick="openNewProjectModal()">
-      <i class="ti ti-plus"></i> Novo projeto
-    </button>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <div style="display:flex; background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-sm); overflow:hidden;">
+        <button type="button" id="btn-kanban" onclick="setView('kanban')" style="padding:7px 12px; border:none; cursor:pointer; font-size:13px; background:var(--purple); color:#fff; display:flex; align-items:center; gap:5px;">
+          <i class="ti ti-layout-kanban"></i> Kanban
+        </button>
+        <button type="button" id="btn-list" onclick="setView('list')" style="padding:7px 12px; border:none; cursor:pointer; font-size:13px; background:transparent; color:var(--text-secondary); display:flex; align-items:center; gap:5px;">
+          <i class="ti ti-list"></i> Lista
+        </button>
+      </div>
+      <button type="button" class="btn btn-primary" onclick="openNewProjectModal()">
+        <i class="ti ti-plus"></i> Novo projeto
+      </button>
+    </div>
   </div>
 
   <div class="page-content">
     <div class="filter-bar">
-      <input type="text" class="form-input" placeholder="Buscar projeto..." id="search-input" oninput="renderBoard()"/>
-      <select class="form-select" id="filter-type" onchange="renderBoard()" style="width:auto;">
+      <input type="text" class="form-input" placeholder="Buscar projeto..." id="search-input" oninput="renderCurrent()"/>
+      <select class="form-select" id="filter-type" onchange="renderCurrent()" style="width:auto;">
         <option value="">Todos os tipos</option>
         <option>Processo</option><option>Melhoria</option><option>Automação</option><option>Fluxo</option><option>Outro</option>
       </select>
-      <select class="form-select" id="filter-priority" onchange="renderBoard()" style="width:auto;">
+      <select class="form-select" id="filter-priority" onchange="renderCurrent()" style="width:auto;">
         <option value="">Todas prioridades</option>
         <option>Alta</option><option>Média</option><option>Baixa</option>
       </select>
+      <select class="form-select" id="filter-stage" onchange="renderCurrent()" style="width:auto;">
+        <option value="">Todas as etapas</option>
+        <option value="ideia">Ideia</option>
+        <option value="diagnostico">Diagnóstico</option>
+        <option value="planejamento">Planejamento</option>
+        <option value="execucao">Execução</option>
+        <option value="revisao">Revisão</option>
+        <option value="entregue">Entregue</option>
+      </select>
     </div>
-    <div class="kanban-board" id="kanban-board"></div>
+    <div id="kanban-board"></div>
+    <div id="list-view" style="display:none;"></div>
   </div>
 </main>
 
@@ -299,7 +319,7 @@ window.addEventListener('load', async () => {
 
 async function refreshBoard() {
   allProjects = fbIsSignedIn() ? await fbGetProjects() : DB.getProjects();
-  renderBoard();
+  renderCurrent();
 }
 
 // ── UPDATE UPLOAD UI based on drive status ──
@@ -320,20 +340,141 @@ function updateUploadUI() {
   }
 }
 
-// ── RENDER BOARD ──
-function renderBoard() {
+let currentView = 'kanban';
+let sortCol = 'updatedAt';
+let sortDir = -1;
+
+function setView(view) {
+  currentView = view;
+  const kanbanEl = document.getElementById('kanban-board');
+  const listEl = document.getElementById('list-view');
+  const btnKanban = document.getElementById('btn-kanban');
+  const btnList = document.getElementById('btn-list');
+  const sub = document.getElementById('view-sub');
+
+  if (view === 'kanban') {
+    kanbanEl.style.display = 'flex';
+    listEl.style.display = 'none';
+    btnKanban.style.background = 'var(--purple)';
+    btnKanban.style.color = '#fff';
+    btnList.style.background = 'transparent';
+    btnList.style.color = 'var(--text-secondary)';
+    if (sub) sub.textContent = 'Fluxo de etapas';
+    renderBoard();
+  } else {
+    kanbanEl.style.display = 'none';
+    listEl.style.display = 'block';
+    btnList.style.background = 'var(--purple)';
+    btnList.style.color = '#fff';
+    btnKanban.style.background = 'transparent';
+    btnKanban.style.color = 'var(--text-secondary)';
+    if (sub) sub.textContent = 'Visão em lista';
+    renderList();
+  }
+}
+
+function renderCurrent() {
+  if (currentView === 'kanban') renderBoard();
+  else renderList();
+}
+
+function getFilteredProjects() {
   const search = document.getElementById('search-input').value.toLowerCase();
   const typeFilter = document.getElementById('filter-type').value;
   const prioFilter = document.getElementById('filter-priority').value;
+  const stageFilter = document.getElementById('filter-stage')?.value || '';
 
-  const projects = allProjects.filter(p => {
+  return allProjects.filter(p => {
     if (search && !p.title.toLowerCase().includes(search) && !(p.description || '').toLowerCase().includes(search)) return false;
     if (typeFilter && p.type !== typeFilter) return false;
     if (prioFilter && p.priority !== prioFilter) return false;
+    if (stageFilter && p.stage !== stageFilter) return false;
     return true;
   });
+}
 
+function renderList() {
+  const container = document.getElementById('list-view');
+  let projects = getFilteredProjects();
+
+  // Sort
+  projects = [...projects].sort((a, b) => {
+    let va = a[sortCol] || '';
+    let vb = b[sortCol] || '';
+    if (sortCol === 'progress') { va = Number(va); vb = Number(vb); }
+    if (sortCol === 'stage') { va = STAGES.findIndex(s => s.id === va); vb = STAGES.findIndex(s => s.id === vb); }
+    if (sortCol === 'priority') {
+      const order = { 'Alta': 0, 'Média': 1, 'Baixa': 2 };
+      va = order[va] ?? 1; vb = order[vb] ?? 1;
+    }
+    if (va < vb) return -1 * sortDir;
+    if (va > vb) return 1 * sortDir;
+    return 0;
+  });
+
+  if (projects.length === 0) {
+    container.innerHTML = '<div class="empty-state" style="padding:48px 24px;"><div class="empty-icon">📋</div><p>Nenhum projeto encontrado</p></div>';
+    return;
+  }
+
+  const arrow = col => sortCol === col ? (sortDir === 1 ? ' ↑' : ' ↓') : '';
+  const thStyle = 'padding:10px 14px; font-size:11px; font-weight:500; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.6px; cursor:pointer; white-space:nowrap; user-select:none; border-bottom:1px solid var(--border);';
+  const tdStyle = 'padding:10px 14px; font-size:13px; border-bottom:1px solid var(--border); vertical-align:middle;';
+
+  let html = '<div style="background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); overflow:hidden;">'
+    + '<table style="width:100%; border-collapse:collapse;">'
+    + '<thead><tr style="background:var(--bg-surface);">'
+    + '<th style="' + thStyle + '" onclick="sortList(\'title\')">Projeto' + arrow('title') + '</th>'
+    + '<th style="' + thStyle + '" onclick="sortList(\'type\')">Tipo' + arrow('type') + '</th>'
+    + '<th style="' + thStyle + '" onclick="sortList(\'stage\')">Etapa' + arrow('stage') + '</th>'
+    + '<th style="' + thStyle + '" onclick="sortList(\'priority\')">Prioridade' + arrow('priority') + '</th>'
+    + '<th style="' + thStyle + '" onclick="sortList(\'progress\')">Progresso' + arrow('progress') + '</th>'
+    + '<th style="' + thStyle + '" onclick="sortList(\'deadline\')">Prazo' + arrow('deadline') + '</th>'
+    + '<th style="' + thStyle + '" onclick="sortList(\'updatedAt\')">Atualizado' + arrow('updatedAt') + '</th>'
+    + '</tr></thead><tbody>';
+
+  projects.forEach(p => {
+    const stage = STAGES.find(s => s.id === p.stage);
+    const checklist = p.checklist || [];
+    const progress = checklist.length > 0 ? Math.round(checklist.filter(i => i.done).length / checklist.length * 100) : (p.progress || 0);
+    const isOverdue = p.deadline && new Date(p.deadline) < new Date() && p.stage !== 'entregue';
+
+    html += '<tr style="cursor:pointer; transition:background 0.15s;" onmouseover="this.style.background=\'var(--bg-hover)\'" onmouseout="this.style.background=\'transparent\'" onclick="openEditModal(\'' + p.id + '\')">'
+      + '<td style="' + tdStyle + '">'
+      + '<div style="font-weight:500; color:var(--text-primary); max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + p.title + '</div>'
+      + (p.problem ? '<div style="font-size:11px; color:var(--text-muted); margin-top:2px; max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + p.problem + '</div>' : '')
+      + '</td>'
+      + '<td style="' + tdStyle + '"><span style="font-size:11px; color:var(--text-muted); padding:2px 7px; background:var(--bg-surface); border-radius:4px; border:1px solid var(--border);">' + (p.type || '—') + '</span></td>'
+      + '<td style="' + tdStyle + '"><span class="stage-badge stage-' + p.stage + '"><span class="stage-dot"></span>' + stage?.label + '</span></td>'
+      + '<td style="' + tdStyle + '"><span class="priority-badge priority-' + (p.priority || 'media').toLowerCase() + '">' + (p.priority || '—') + '</span></td>'
+      + '<td style="' + tdStyle + '; min-width:120px;">'
+      + '<div style="display:flex; align-items:center; gap:8px;">'
+      + '<div style="flex:1; height:4px; background:var(--border); border-radius:2px; overflow:hidden;"><div style="height:100%; width:' + progress + '%; background:' + (progress === 100 ? 'var(--green)' : 'var(--purple)') + '; border-radius:2px;"></div></div>'
+      + '<span style="font-size:11px; font-family:var(--mono); color:var(--text-muted); min-width:28px;">' + progress + '%</span>'
+      + '</div></td>'
+      + '<td style="' + tdStyle + '; font-family:var(--mono); font-size:11px; color:' + (isOverdue ? 'var(--coral)' : 'var(--text-muted)') + ';">'
+      + (p.deadline ? (isOverdue ? '⚠ ' : '') + formatDate(p.deadline) : '—')
+      + '</td>'
+      + '<td style="' + tdStyle + '; font-size:11px; color:var(--text-muted);">' + timeAgo(p.updatedAt) + '</td>'
+      + '</tr>';
+  });
+
+  html += '</tbody></table></div>';
+  html += '<div style="font-size:11px; color:var(--text-muted); margin-top:10px; padding:0 4px;">' + projects.length + ' projeto' + (projects.length !== 1 ? 's' : '') + '</div>';
+  container.innerHTML = html;
+}
+
+function sortList(col) {
+  if (sortCol === col) sortDir *= -1;
+  else { sortCol = col; sortDir = 1; }
+  renderList();
+}
+
+
+function renderBoard() {
+  const projects = getFilteredProjects();
   const board = document.getElementById('kanban-board');
+  board.className = 'kanban-board';
   board.innerHTML = '';
 
   STAGES.forEach(stage => {
