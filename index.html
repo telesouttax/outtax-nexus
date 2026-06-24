@@ -105,26 +105,19 @@ async function loadDashboard() {
     review: projects.filter(p => p.stage === 'revisao').length,
   };
 
-  const metrics = [
-    { label: 'Total de projetos', value: m.total,      sub: 'cadastrados',            color: 'purple' },
-    { label: 'Entregues',         value: m.delivered,  sub: 'concluídos',             color: 'green'  },
-    { label: 'Em andamento',      value: m.inProgress, sub: 'em execução',            color: 'blue'   },
-    { label: 'Pendentes',         value: m.pending,    sub: 'na etapa de ideia',      color: 'amber'  },
-    { label: 'Prazo vencido',     value: overdue.length, sub: 'precisam de atenção', color: 'coral'  },
-  ];
-
-  const mg = document.getElementById('metrics-grid');
-  mg.innerHTML = '';
-  metrics.forEach(mt => {
-    mg.innerHTML += '<div class="metric-card ' + mt.color + '"><div class="metric-label">' + mt.label + '</div><div class="metric-value">' + String(mt.value).padStart(2,'0') + '</div><div class="metric-sub">' + mt.sub + '</div></div>';
-  });
-
-  // ── DEADLINE ALERTS ──
+  // ── DEADLINE ALERTS (calculado antes dos metrics) ──
   const today = new Date(); today.setHours(0,0,0,0);
   const in7 = new Date(today); in7.setDate(in7.getDate() + 7);
-
   const overdue = projects.filter(p => p.deadline && p.stage !== 'entregue' && new Date(p.deadline) < today);
   const dueSoon = projects.filter(p => p.deadline && p.stage !== 'entregue' && new Date(p.deadline) >= today && new Date(p.deadline) <= in7);
+
+  const metrics = [
+    { label: 'Total de projetos', value: m.total,        sub: 'cadastrados',          color: 'purple' },
+    { label: 'Entregues',         value: m.delivered,    sub: 'concluídos',           color: 'green'  },
+    { label: 'Em andamento',      value: m.inProgress,   sub: 'em execução',          color: 'blue'   },
+    { label: 'Pendentes',         value: m.pending,      sub: 'na etapa de ideia',    color: 'amber'  },
+    { label: 'Prazo vencido',     value: overdue.length, sub: 'precisam de atenção',  color: 'coral'  },
+  ];
 
   const alertsEl = document.getElementById('deadline-alerts');
   if (overdue.length > 0 || dueSoon.length > 0) {
