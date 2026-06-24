@@ -181,7 +181,15 @@ async function loadDashboard() {
     alertsEl.style.display = 'none';
   }
 
+  // ── METRICS ──
+  const mg = document.getElementById('metrics-grid');
+  mg.innerHTML = '';
+  metrics.forEach(mt => {
+    mg.innerHTML += '<div class="metric-card ' + mt.color + '"><div class="metric-label">' + mt.label + '</div><div class="metric-value">' + String(mt.value).padStart(2,'0') + '</div><div class="metric-sub">' + mt.sub + '</div></div>';
+  });
 
+  // ── STAGE BARS ──
+  const stageBars = document.getElementById('stage-bars');
   stageBars.innerHTML = '';
   STAGES.forEach(stage => {
     const count = projects.filter(p => p.stage === stage.id).length;
