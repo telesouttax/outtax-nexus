@@ -160,11 +160,15 @@ function showToast(message) {
 }
 
 // ── IMAGE HELPERS ──
-function addImageToProject(projectId, base64, name) {
+function addImageToProject(projectId, base64, name, imageObj) {
   const p = DB.getProjects().find(x => x.id === projectId);
   if (!p) return;
   const images = p.images || [];
-  images.push({ id: 'img_' + Date.now(), base64, name, addedAt: new Date().toISOString() });
+  if (imageObj) {
+    images.push(imageObj);
+  } else {
+    images.push({ id: 'img_' + Date.now(), base64, name, addedAt: new Date().toISOString() });
+  }
   updateProject(projectId, { images });
 }
 
