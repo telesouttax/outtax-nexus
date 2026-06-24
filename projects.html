@@ -185,7 +185,7 @@
       <div style="display:flex; gap:8px;">
         <input type="text" class="form-input" id="checklist-new-input" placeholder="Nova tarefa..." style="flex:1;"
           onkeydown="if(event.key==='Enter'){addChecklistItemUI();event.preventDefault();}"/>
-        <button class="btn btn-ghost btn-sm" onclick="addChecklistItemUI()">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="addChecklistItemUI()">
           <i class="ti ti-plus"></i>
         </button>
       </div>
@@ -200,7 +200,7 @@
       <div style="display:flex; gap:8px; margin-bottom:10px;">
         <input type="text" class="form-input" id="history-new-input" placeholder="O que aconteceu? Ex: Reunião realizada com o time..." style="flex:1;"
           onkeydown="if(event.key==='Enter'){addHistoryItemUI();event.preventDefault()}"/>
-        <button class="btn btn-ghost btn-sm" onclick="addHistoryItemUI()" style="flex-shrink:0;">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="addHistoryItemUI()" style="flex-shrink:0;">
           <i class="ti ti-send"></i>
         </button>
       </div>
@@ -226,12 +226,15 @@
     </div>
 
     <div class="form-actions" style="justify-content:space-between;">
-      <button class="btn btn-ghost" style="color:var(--coral); border-color:rgba(248,113,113,0.3);" onclick="confirmDelete()">
+      <button type="button" class="btn btn-ghost" style="color:var(--coral); border-color:rgba(248,113,113,0.3);" onclick="confirmDelete()">
         <i class="ti ti-trash"></i> Excluir
       </button>
       <div style="display:flex; gap:10px;">
-        <button class="btn btn-ghost" onclick="closeModal('modal-edit')">Cancelar</button>
-        <button class="btn btn-primary" onclick="submitEditProject()">
+        <button type="button" class="btn btn-ghost" onclick="exportProjectPDF()">
+          <i class="ti ti-file-export"></i> Exportar PDF
+        </button>
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modal-edit')">Cancelar</button>
+        <button type="button" class="btn btn-primary" onclick="submitEditProject()">
           <i class="ti ti-device-floppy"></i> Salvar
         </button>
       </div>
@@ -528,6 +531,123 @@ function confirmDelete() {
   renderBoard();
   updateNavCounts();
   showToast('Projeto excluído');
+}
+
+// ── PDF EXPORT ──
+function exportProjectPDF() {
+  if (!editingId) return;
+  const p = DB.getProjects().find(x => x.id === editingId);
+  if (!p) return;
+
+  const stage = STAGES.find(s => s.id === p.stage);
+  const checklist = p.checklist || [];
+  const history = p.history || [];
+  const done = checklist.filter(i => i.done).length;
+  const progress = checklist.length > 0 ? Math.round(done / checklist.length * 100) : (p.progress || 0);
+  const progressBar = '█'.repeat(Math.round(progress / 10)) + '░'.repeat(10 - Math.round(progress / 10));
+
+  const priorityColor = p.priority === 'Alta' ? '#F87171' : p.priority === 'Média' ? '#F59E0B' : '#22C55E';
+  const stageColors = { ideia: '#8B5CF6', diagnostico: '#3B82F6', planejamento: '#14B8A6', execucao: '#F59E0B', revisao: '#F87171', entregue: '#22C55E' };
+  const stageColor = stageColors[p.stage] || '#8B5CF6';
+
+  const checklistHTML = checklist.length > 0 ? checklist.map(item => `
+    <tr>
+      <td style="padding:6px 0; border-bottom:1px solid #f0f0f0; width:24px;">
+        <span style="display:inline-block; width:16px; height:16px; border-radius:4px; border:2px solid ${item.done ? '#8B5CF6' : '#ccc'}; background:${item.done ? '#8B5CF6' : 'white'}; text-align:center; line-height:14px; font-size:11px; color:white;">${item.done ? '✓' : ''}</span>
+      </td>
+      <td style="padding:6px 8px; border-bottom:1px solid #f0f0f0; font-size:13px; color:${item.done ? '#999' : '#333'}; text-decoration:${item.done ? 'line-through' : 'none'};">${item.text}</td>
+    </tr>`).join('') : '<tr><td colspan="2" style="color:#999; font-size:12px; padding:8px 0;">Nenhuma tarefa cadastrada</td></tr>';
+
+  const historyHTML = history.length > 0 ? history.map(item => `
+    <div style="padding:10px 12px; margin-bottom:8px; border-left:3px solid #8B5CF6; background:#fafafa; border-radius:0 6px 6px 0;">
+      <div style="font-size:13px; color:#333; margin-bottom:4px;">${item.text}</div>
+      <div style="font-size:11px; color:#999;">${formatDateTime(item.createdAt)}</div>
+    </div>`).join('') : '<div style="color:#999; font-size:12px;">Nenhum registro no histórico</div>';
+
+  const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Nexus — ${p.title}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #1a1a1a; background: white; padding: 48px; max-width: 760px; margin: 0 auto; }
+    .header { border-bottom: 3px solid #8B5CF6; padding-bottom: 20px; margin-bottom: 28px; }
+    .brand { font-size: 11px; font-weight: 600; color: #8B5CF6; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 10px; }
+    .project-title { font-size: 24px; font-weight: 700; color: #0f0f11; margin-bottom: 10px; line-height: 1.3; }
+    .badges { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .badge { padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+    .section { margin-bottom: 28px; }
+    .section-title { font-size: 11px; font-weight: 700; color: #8B5CF6; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid #eee; }
+    .section-text { font-size: 13px; color: #444; line-height: 1.7; }
+    .progress-wrap { margin: 12px 0; }
+    .progress-label { display: flex; justify-content: space-between; font-size: 12px; color: #666; margin-bottom: 6px; }
+    .progress-track { height: 8px; background: #eee; border-radius: 4px; overflow: hidden; }
+    .progress-fill { height: 100%; background: #8B5CF6; border-radius: 4px; }
+    table { width: 100%; border-collapse: collapse; }
+    .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+    .footer-text { font-size: 11px; color: #aaa; }
+    @media print { body { padding: 32px; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="brand">⬡ Nexus — Relatório de Projeto</div>
+    <div class="project-title">${p.title}</div>
+    <div class="badges">
+      <span class="badge" style="background:${stageColor}20; color:${stageColor}; border:1px solid ${stageColor}40;">${stage?.icon} ${stage?.label}</span>
+      <span class="badge" style="background:${priorityColor}20; color:${priorityColor}; border:1px solid ${priorityColor}40;">Prioridade ${p.priority}</span>
+      <span class="badge" style="background:#f0f0f0; color:#666;">${p.type}</span>
+      ${p.responsible ? `<span class="badge" style="background:#f0f0f0; color:#666;">👤 ${p.responsible}</span>` : ''}
+      ${p.deadline ? `<span class="badge" style="background:#f0f0f0; color:#666;">📅 Prazo: ${formatDate(p.deadline)}</span>` : ''}
+    </div>
+  </div>
+
+  ${p.problem ? `<div class="section">
+    <div class="section-title">Problema a resolver</div>
+    <div class="section-text">${p.problem}</div>
+  </div>` : ''}
+
+  ${p.description ? `<div class="section">
+    <div class="section-title">Descrição</div>
+    <div class="section-text">${p.description}</div>
+  </div>` : ''}
+
+  <div class="section">
+    <div class="section-title">Progresso</div>
+    <div class="progress-wrap">
+      <div class="progress-label">
+        <span>${checklist.length > 0 ? done + ' de ' + checklist.length + ' tarefas concluídas' : 'Progresso geral'}</span>
+        <strong>${progress}%</strong>
+      </div>
+      <div class="progress-track"><div class="progress-fill" style="width:${progress}%"></div></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Checklist de tarefas (${done}/${checklist.length})</div>
+    <table>${checklistHTML}</table>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Histórico de atualizações</div>
+    ${historyHTML}
+  </div>
+
+  <div class="footer">
+    <div class="footer-text">Gerado em ${formatDateTime(new Date().toISOString())}</div>
+    <div class="footer-text" style="color:#8B5CF6; font-weight:600;">Nexus — Gestão de processos</div>
+  </div>
+
+  <script>window.onload = function() { window.print(); }<\/script>
+</body>
+</html>`;
+
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const win = window.open(url, '_blank');
+  if (!win) showToast('Permita popups para exportar o PDF');
+  else showToast('Abrindo relatório para impressão...');
 }
 
 // ── HISTORY UI ──
