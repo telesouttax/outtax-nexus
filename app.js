@@ -1,853 +1,309 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Nexus — Projetos</title>
-  <link rel="stylesheet" href="style.css"/>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css"/>
-</head>
-<body>
+// ── FLOWDESK — app.js ──
 
-<aside class="sidebar">
-  <div class="sidebar-logo">
-    <div class="wordmark"><div class="dot"></div>Nexus</div>
-    <div class="tagline">Gestão de processos</div>
-  </div>
-  <nav class="sidebar-nav">
-    <div class="nav-section-label">Menu</div>
-    <a class="nav-item" data-page="index.html" href="index.html">
-      <i class="ti ti-layout-dashboard nav-icon"></i> Dashboard
-    </a>
-    <a class="nav-item" data-page="projects.html" href="projects.html">
-      <i class="ti ti-layout-kanban nav-icon"></i> Projetos
-      <span class="nav-badge" id="nav-projects-count">0</span>
-    </a>
-    <a class="nav-item" data-page="ideas.html" href="ideas.html">
-      <i class="ti ti-bulb nav-icon"></i> Banco de ideias
-      <span class="nav-badge" id="nav-ideas-count">0</span>
-    </a>
-  </nav>
-  <div class="sidebar-footer">
-    <div style="padding: 0 10px; display:flex; flex-direction:column; gap:8px;">
-      <button id="drive-connect-btn" class="btn btn-ghost btn-sm" style="width:100%; justify-content:center;">
-        <i class="ti ti-brand-google-drive"></i> Conectar Drive
-      </button>
-      <div id="drive-status" class="text-muted" style="font-size:10px; text-align:center; line-height:1.4;">Conecte o Drive para salvar imagens na nuvem</div>
-    </div>
-  </div>
-</aside>
+const STAGES = [
+  { id: 'ideia',        label: 'Ideia',        icon: '💡', color: 'purple' },
+  { id: 'diagnostico',  label: 'Diagnóstico',  icon: '🔍', color: 'blue'   },
+  { id: 'planejamento', label: 'Planejamento', icon: '📋', color: 'teal'   },
+  { id: 'execucao',     label: 'Execução',     icon: '⚙️', color: 'amber'  },
+  { id: 'revisao',      label: 'Revisão',      icon: '🔄', color: 'coral'  },
+  { id: 'entregue',     label: 'Entregue',     icon: '✅', color: 'green'  },
+];
 
-<main class="main">
-  <div class="topbar">
-    <div>
-      <div class="topbar-title">Projetos</div>
-      <div class="topbar-sub">Fluxo de etapas</div>
-    </div>
-    <button class="btn btn-primary" onclick="openNewProjectModal()">
-      <i class="ti ti-plus"></i> Novo projeto
-    </button>
-  </div>
+const PRIORITIES = ['Alta', 'Média', 'Baixa'];
+const TYPES = ['Processo', 'Melhoria', 'Automação', 'Fluxo', 'Outro'];
 
-  <div class="page-content">
-    <div class="filter-bar">
-      <input type="text" class="form-input" placeholder="Buscar projeto..." id="search-input" oninput="renderBoard()"/>
-      <select class="form-select" id="filter-type" onchange="renderBoard()" style="width:auto;">
-        <option value="">Todos os tipos</option>
-        <option>Processo</option><option>Melhoria</option><option>Automação</option><option>Fluxo</option><option>Outro</option>
-      </select>
-      <select class="form-select" id="filter-priority" onchange="renderBoard()" style="width:auto;">
-        <option value="">Todas prioridades</option>
-        <option>Alta</option><option>Média</option><option>Baixa</option>
-      </select>
-    </div>
-    <div class="kanban-board" id="kanban-board"></div>
-  </div>
-</main>
+// ── STORAGE ──
+const DB = {
+  getProjects() { return JSON.parse(localStorage.getItem('fd_projects') || '[]'); },
+  saveProjects(p) { localStorage.setItem('fd_projects', JSON.stringify(p)); },
+  getIdeas() { return JSON.parse(localStorage.getItem('fd_ideas') || '[]'); },
+  saveIdeas(i) { localStorage.setItem('fd_ideas', JSON.stringify(i)); },
+};
 
-<!-- MODAL: NEW PROJECT -->
-<div class="modal-overlay hidden" id="modal-new">
-  <div class="modal">
-    <div class="modal-header">
-      <div class="modal-title">Novo projeto</div>
-      <button class="modal-close" onclick="closeModal('modal-new')">✕</button>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Título do projeto *</label>
-      <input type="text" class="form-input" id="new-title" placeholder="Ex: Automatizar relatório semanal"/>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Problema a resolver</label>
-      <textarea class="form-textarea" id="new-problem" placeholder="Qual dor ou ineficiência esse projeto resolve?"></textarea>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Descrição</label>
-      <textarea class="form-textarea" id="new-desc" placeholder="Detalhe o que será feito..."></textarea>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Tipo</label>
-        <select class="form-select" id="new-type">
-          <option>Processo</option><option>Melhoria</option><option>Automação</option><option>Fluxo</option><option>Outro</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Prioridade</label>
-        <select class="form-select" id="new-priority">
-          <option>Alta</option><option selected>Média</option><option>Baixa</option>
-        </select>
-      </div>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Responsável</label>
-        <input type="text" class="form-input" id="new-responsible" placeholder="Nome"/>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Prazo estimado</label>
-        <input type="date" class="form-input" id="new-deadline"/>
-      </div>
-    </div>
-    <div class="form-actions">
-      <button class="btn btn-ghost" onclick="closeModal('modal-new')">Cancelar</button>
-      <button class="btn btn-primary" onclick="submitNewProject()">
-        <i class="ti ti-plus"></i> Criar projeto
-      </button>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL: EDIT PROJECT -->
-<div class="modal-overlay hidden" id="modal-edit">
-  <div class="modal" style="max-width:600px;">
-    <div class="modal-header">
-      <div class="modal-title" id="edit-modal-title">Editar projeto</div>
-      <button class="modal-close" onclick="closeModal('modal-edit')">✕</button>
-    </div>
-
-    <div class="stage-flow" id="edit-stage-flow"></div>
-
-    <div class="form-group">
-      <label class="form-label">Título</label>
-      <input type="text" class="form-input" id="edit-title"/>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Problema a resolver</label>
-      <textarea class="form-textarea" id="edit-problem"></textarea>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Descrição</label>
-      <textarea class="form-textarea" id="edit-desc"></textarea>
-    </div>
-
-    <div id="stage-specific-fields"></div>
-
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Tipo</label>
-        <select class="form-select" id="edit-type">
-          <option>Processo</option><option>Melhoria</option><option>Automação</option><option>Fluxo</option><option>Outro</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Prioridade</label>
-        <select class="form-select" id="edit-priority">
-          <option>Alta</option><option>Média</option><option>Baixa</option>
-        </select>
-      </div>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Responsável</label>
-        <input type="text" class="form-input" id="edit-responsible"/>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Prazo estimado</label>
-        <input type="date" class="form-input" id="edit-deadline"/>
-      </div>
-    </div>
-
-    <div class="form-group">
-      <label class="form-label">Progresso (%)</label>
-      <div style="display:flex; align-items:center; gap:12px;">
-        <input type="range" min="0" max="100" step="5" class="form-input" id="edit-progress" style="padding:0; border:none; background:none; cursor:pointer;" oninput="document.getElementById('edit-progress-val').textContent=this.value+'%'"/>
-        <span id="edit-progress-val" style="font-family:var(--mono); font-size:13px; min-width:36px;">0%</span>
-      </div>
-    </div>
-
-    <!-- CHECKLIST SECTION -->
-    <div class="form-group">
-      <label class="form-label" style="display:flex; align-items:center; justify-content:space-between;">
-        <span>Checklist de tarefas</span>
-        <span id="checklist-summary" style="font-size:11px; color:var(--text-muted); font-family:var(--mono);"></span>
-      </label>
-      <div id="checklist-items" style="display:flex; flex-direction:column; gap:4px; margin-bottom:10px;"></div>
-      <div style="display:flex; gap:8px;">
-        <input type="text" class="form-input" id="checklist-new-input" placeholder="Nova tarefa..." style="flex:1;"
-          onkeydown="if(event.key==='Enter'){addChecklistItemUI();event.preventDefault();}"/>
-        <button type="button" class="btn btn-ghost btn-sm" onclick="addChecklistItemUI()">
-          <i class="ti ti-plus"></i>
-        </button>
-      </div>
-    </div>
-
-    <!-- HISTORY SECTION -->
-    <div class="form-group">
-      <label class="form-label" style="display:flex; align-items:center; justify-content:space-between;">
-        <span>Histórico de atualizações</span>
-        <span id="history-count" style="font-size:11px; color:var(--text-muted); font-family:var(--mono);"></span>
-      </label>
-      <div style="display:flex; gap:8px; margin-bottom:10px;">
-        <input type="text" class="form-input" id="history-new-input" placeholder="O que aconteceu? Ex: Reunião realizada com o time..." style="flex:1;"
-          onkeydown="if(event.key==='Enter'){addHistoryItemUI();event.preventDefault()}"/>
-        <button type="button" class="btn btn-ghost btn-sm" onclick="addHistoryItemUI()" style="flex-shrink:0;">
-          <i class="ti ti-send"></i>
-        </button>
-      </div>
-      <div id="history-items" style="display:flex; flex-direction:column; gap:4px; max-height:200px; overflow-y:auto;"></div>
-    </div>
-
-    <!-- IMAGES SECTION -->
-    <div class="form-group">
-      <label class="form-label" style="display:flex; align-items:center; justify-content:space-between;">
-        <span>Imagens do projeto</span>
-        <span id="drive-img-status" style="font-size:10px; color:var(--text-muted);"></span>
-      </label>
-
-      <div id="edit-images-grid" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; min-height:8px;"></div>
-
-      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-        <label id="upload-label" style="display:inline-flex; align-items:center; gap:6px; padding:7px 14px; background:var(--bg-surface); border:1px dashed var(--border-light); border-radius:var(--radius-sm); cursor:pointer; font-size:12px; color:var(--text-secondary); transition:all 0.15s;">
-          <i class="ti ti-upload" style="font-size:14px;"></i> <span id="upload-label-text">Adicionar imagem</span>
-          <input type="file" accept="image/*" multiple style="display:none;" id="edit-image-input" onchange="handleImageUpload(event)"/>
-        </label>
-        <span id="drive-hint" style="font-size:11px; color:var(--text-muted);"></span>
-      </div>
-    </div>
-
-    <div class="form-actions" style="justify-content:space-between;">
-      <button type="button" class="btn btn-ghost" style="color:var(--coral); border-color:rgba(248,113,113,0.3);" onclick="confirmDelete()">
-        <i class="ti ti-trash"></i> Excluir
-      </button>
-      <div style="display:flex; gap:10px;">
-        <button type="button" class="btn btn-ghost" onclick="exportProjectPDF()">
-          <i class="ti ti-file-export"></i> Exportar PDF
-        </button>
-        <button type="button" class="btn btn-ghost" onclick="closeModal('modal-edit')">Cancelar</button>
-        <button type="button" class="btn btn-primary" onclick="submitEditProject()">
-          <i class="ti ti-device-floppy"></i> Salvar
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL: IMAGE VIEWER -->
-<div class="modal-overlay hidden" id="modal-image">
-  <div style="position:relative; max-width:90vw; max-height:90vh;">
-    <img id="modal-image-src" style="max-width:90vw; max-height:85vh; border-radius:var(--radius-lg); display:block;"/>
-    <div style="display:flex; gap:10px; margin-top:12px; justify-content:center;">
-      <a id="modal-image-link" href="#" target="_blank" class="btn btn-ghost btn-sm">
-        <i class="ti ti-external-link"></i> Abrir no Drive
-      </a>
-      <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-image')">Fechar</button>
-    </div>
-    <button onclick="closeModal('modal-image')" style="position:absolute; top:-12px; right:-12px; background:var(--bg-card); border:1px solid var(--border); color:var(--text-primary); border-radius:50%; width:28px; height:28px; cursor:pointer; font-size:14px; display:flex; align-items:center; justify-content:center;">✕</button>
-  </div>
-</div>
-
-<script src="app.js"></script>
-<script src="drive.js"></script>
-<script src="https://accounts.google.com/gsi/client" async defer></script>
-<script>
-seedIfEmpty();
-setActiveNav();
-updateNavCounts();
-
-let editingId = null;
-let editingProjectTitle = '';
-
-function updateNavCounts() {
-  document.getElementById('nav-projects-count').textContent = DB.getProjects().length;
-  document.getElementById('nav-ideas-count').textContent = DB.getIdeas().length;
-}
-
-// Init Drive after GSI loads
-window.addEventListener('load', () => {
-  setTimeout(() => driveInit(), 800);
-});
-
-// ── UPDATE UPLOAD UI based on drive status ──
-function updateUploadUI() {
-  const hint = document.getElementById('drive-hint');
-  const labelText = document.getElementById('upload-label-text');
-  const statusEl = document.getElementById('drive-img-status');
-  if (!hint) return;
-  if (driveIsConnected()) {
-    hint.textContent = 'Salvo no Google Drive';
-    hint.style.color = 'var(--green)';
-    if (labelText) labelText.textContent = 'Adicionar imagem';
-    if (statusEl) { statusEl.textContent = '🟢 Drive conectado'; statusEl.style.color = 'var(--green)'; }
-  } else {
-    hint.innerHTML = '<i class="ti ti-alert-circle" style="font-size:12px; vertical-align:-1px;"></i> <a href="#" onclick="driveSignIn();return false;" style="color:var(--purple-light);">Conecte o Drive</a> para salvar na nuvem';
-    if (labelText) labelText.textContent = 'Adicionar imagem (local)';
-    if (statusEl) { statusEl.textContent = '⚠ Drive não conectado'; statusEl.style.color = 'var(--amber)'; }
-  }
-}
-
-// ── RENDER BOARD ──
-function renderBoard() {
-  const search = document.getElementById('search-input').value.toLowerCase();
-  const typeFilter = document.getElementById('filter-type').value;
-  const prioFilter = document.getElementById('filter-priority').value;
-
-  const projects = DB.getProjects().filter(p => {
-    if (search && !p.title.toLowerCase().includes(search) && !(p.description || '').toLowerCase().includes(search)) return false;
-    if (typeFilter && p.type !== typeFilter) return false;
-    if (prioFilter && p.priority !== prioFilter) return false;
-    return true;
-  });
-
-  const board = document.getElementById('kanban-board');
-  board.innerHTML = '';
-
-  STAGES.forEach(stage => {
-    const stageProjects = projects.filter(p => p.stage === stage.id);
-
-    const col = document.createElement('div');
-    col.className = 'kanban-column';
-
-    const header = document.createElement('div');
-    header.className = 'kanban-header';
-    header.innerHTML = '<div class="col-title"><span class="stage-badge stage-' + stage.id + '"><span class="stage-dot"></span>' + stage.label + '</span></div><span class="col-count">' + stageProjects.length + '</span>';
-    col.appendChild(header);
-
-    const body = document.createElement('div');
-    body.className = 'kanban-body';
-    body.id = 'col-' + stage.id;
-
-    if (stageProjects.length === 0) {
-      body.innerHTML = '<div class="empty-state" style="padding:24px 12px;"><div class="empty-icon" style="font-size:20px;">' + stage.icon + '</div><p style="font-size:11px;">Nenhum projeto aqui</p></div>';
-    }
-
-    stageProjects.forEach(function(p) {
-      const card = document.createElement('div');
-      card.className = 'project-card';
-      card.onclick = function() { openEditModal(p.id); };
-
-      // Title
-      const titleEl = document.createElement('div');
-      titleEl.className = 'card-title';
-      titleEl.textContent = p.title;
-      card.appendChild(titleEl);
-
-      // Description
-      if (p.description) {
-        const descEl = document.createElement('div');
-        descEl.className = 'card-desc';
-        descEl.textContent = p.description;
-        card.appendChild(descEl);
-      }
-
-      // Meta row
-      const meta = document.createElement('div');
-      meta.className = 'card-meta';
-      meta.innerHTML = '<span class="priority-badge priority-' + (p.priority || 'media').toLowerCase() + '">' + (p.priority || 'Média') + '</span>'
-        + '<span style="font-size:10px;color:var(--text-muted);padding:2px 6px;background:var(--bg-surface);border-radius:4px;border:1px solid var(--border);">' + (p.type || 'Processo') + '</span>'
-        + (p.deadline
-          ? '<span class="card-date"><i class="ti ti-calendar" style="font-size:10px;"></i> ' + formatDate(p.deadline) + '</span>'
-          : '<span class="card-date">' + timeAgo(p.updatedAt) + '</span>');
-      card.appendChild(meta);
-
-      // Progress bar
-      if (p.progress > 0) {
-        const bar = document.createElement('div');
-        bar.className = 'progress-bar';
-        bar.innerHTML = '<div class="progress-fill" style="width:' + p.progress + '%"></div>';
-        card.appendChild(bar);
-      }
-
-      // Checklist preview
-      const checklist = p.checklist || [];
-      if (checklist.length > 0) {
-        const done = checklist.filter(function(i) { return i.done; }).length;
-        const total = checklist.length;
-        const pct = Math.round(done / total * 100);
-        const ckRow = document.createElement('div');
-        ckRow.style.cssText = 'margin-top:6px;display:flex;align-items:center;gap:6px;';
-        ckRow.innerHTML = '<i class="ti ti-checklist" style="font-size:11px;color:var(--text-muted);"></i>'
-          + '<span style="font-size:10px;color:var(--text-muted);font-family:var(--mono);">' + done + '/' + total + '</span>'
-          + '<div style="flex:1;height:3px;background:var(--border);border-radius:2px;overflow:hidden;">'
-          + '<div style="height:100%;width:' + pct + '%;background:' + (done === total ? 'var(--green)' : 'var(--purple)') + ';border-radius:2px;"></div></div>';
-        card.appendChild(ckRow);
-      }
-
-      // Images preview
-      const images = p.images || [];
-      if (images.length > 0) {
-        const imgRow = document.createElement('div');
-        imgRow.style.cssText = 'margin-top:8px;display:flex;gap:4px;flex-wrap:wrap;align-items:center;';
-        images.slice(0, 3).forEach(function(img) {
-          const im = document.createElement('img');
-          im.src = img.thumbnailUrl || img.base64 || '';
-          im.style.cssText = 'width:36px;height:36px;object-fit:cover;border-radius:4px;border:1px solid var(--border);';
-          im.onerror = function() { this.style.display = 'none'; };
-          imgRow.appendChild(im);
-        });
-        if (images.length > 3) {
-          const more = document.createElement('div');
-          more.style.cssText = 'width:36px;height:36px;border-radius:4px;background:var(--bg-surface);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--text-muted);';
-          more.textContent = '+' + (images.length - 3);
-          imgRow.appendChild(more);
-        }
-        const driveLabel = document.createElement('span');
-        driveLabel.style.cssText = 'font-size:10px;color:var(--text-muted);';
-        driveLabel.innerHTML = '<i class="ti ti-brand-google-drive" style="font-size:11px;vertical-align:-1px;"></i> ' + images.length + ' imagem' + (images.length > 1 ? 's' : '');
-        imgRow.appendChild(driveLabel);
-        card.appendChild(imgRow);
-      }
-
-      body.appendChild(card);
-    });
-
-    col.appendChild(body);
-    board.appendChild(col);
-  });
-}
-
-// ── NEW PROJECT ──
-function openNewProjectModal() {
-  ['new-title','new-problem','new-desc','new-responsible'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('new-deadline').value = '';
-  openModal('modal-new');
-  setTimeout(() => document.getElementById('new-title').focus(), 100);
-}
-
-function submitNewProject() {
-  const title = document.getElementById('new-title').value.trim();
-  if (!title) { document.getElementById('new-title').focus(); return; }
-  createProject({
-    title,
-    problem: document.getElementById('new-problem').value.trim(),
-    description: document.getElementById('new-desc').value.trim(),
-    type: document.getElementById('new-type').value,
-    priority: document.getElementById('new-priority').value,
-    responsible: document.getElementById('new-responsible').value.trim(),
-    deadline: document.getElementById('new-deadline').value,
-  });
-  closeModal('modal-new');
-  renderBoard();
-  updateNavCounts();
-  showToast('Projeto criado');
-}
-
-// ── EDIT PROJECT ──
-function openEditModal(id) {
-  const p = DB.getProjects().find(x => x.id === id);
-  if (!p) return;
-  editingId = id;
-  editingProjectTitle = p.title;
-
-  document.getElementById('edit-modal-title').textContent = p.title;
-  document.getElementById('edit-title').value = p.title;
-  document.getElementById('edit-problem').value = p.problem || '';
-  document.getElementById('edit-desc').value = p.description || '';
-  document.getElementById('edit-type').value = p.type || 'Processo';
-  document.getElementById('edit-priority').value = p.priority || 'Média';
-  document.getElementById('edit-responsible').value = p.responsible || '';
-  document.getElementById('edit-deadline').value = p.deadline || '';
-  document.getElementById('edit-progress').value = p.progress || 0;
-  document.getElementById('edit-progress-val').textContent = (p.progress || 0) + '%';
-
-  // Stage flow indicator
-  const flow = document.getElementById('edit-stage-flow');
-  const currentIdx = stageIndex(p.stage);
-  flow.innerHTML = STAGES.map((s, i) => `
-    <div class="stage-flow-step ${i < currentIdx ? 'done' : i === currentIdx ? 'active' : ''}" title="${s.label}"></div>
-  `).join('') + `<span style="font-size:11px; color:var(--text-muted); margin-left:8px; white-space:nowrap;">${STAGES[currentIdx]?.label}</span>`;
-
-  // Stage-specific fields + nav buttons
-  const specific = document.getElementById('stage-specific-fields');
-  specific.innerHTML = '';
-  if (p.stage === 'execucao') {
-    specific.innerHTML += `<div class="form-group"><label class="form-label">Bloqueios / obstáculos</label><textarea class="form-textarea" id="edit-blockers" placeholder="Existe algo impedindo o avanço?">${p.blockers || ''}</textarea></div>`;
-  }
-  if (p.stage === 'planejamento') {
-    specific.innerHTML += `<div class="form-group"><label class="form-label">Escopo definido</label><textarea class="form-textarea" id="edit-scope" placeholder="O que está dentro e fora do escopo?">${p.scope || ''}</textarea></div>`;
-  }
-  if (p.stage === 'entregue') {
-    specific.innerHTML += `<div class="form-group"><label class="form-label">Resultado final / aprendizados</label><textarea class="form-textarea" id="edit-result" placeholder="O que foi entregue? Quais os aprendizados?">${p.result || ''}</textarea></div>`;
-  }
-  specific.innerHTML += `
-    <div style="display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap;">
-      ${currentIdx > 0 ? `<button class="btn btn-ghost btn-sm" onclick="moveStage('${id}','back')"><i class="ti ti-arrow-left"></i> Voltar etapa</button>` : ''}
-      ${currentIdx < STAGES.length-1 ? `<button class="btn btn-primary btn-sm" onclick="moveStage('${id}','next')">Avançar etapa <i class="ti ti-arrow-right"></i></button>` : ''}
-    </div>`;
-
-  updateUploadUI();
-  renderChecklist(p);
-  renderHistory(p);
-  renderEditImages(p);
-  openModal('modal-edit');
-}
-
-function submitEditProject() {
-  if (!editingId) return;
-  const updates = {
-    title: document.getElementById('edit-title').value.trim(),
-    problem: document.getElementById('edit-problem').value.trim(),
-    description: document.getElementById('edit-desc').value.trim(),
-    type: document.getElementById('edit-type').value,
-    priority: document.getElementById('edit-priority').value,
-    responsible: document.getElementById('edit-responsible').value.trim(),
-    deadline: document.getElementById('edit-deadline').value,
-    progress: parseInt(document.getElementById('edit-progress').value),
+// ── PROJECT CRUD ──
+function createProject(data) {
+  const projects = DB.getProjects();
+  const project = {
+    id: 'p_' + Date.now(),
+    title: data.title,
+    description: data.description || '',
+    type: data.type || 'Processo',
+    priority: data.priority || 'Média',
+    responsible: data.responsible || '',
+    stage: data.stage || 'ideia',
+    progress: 0,
+    problem: data.problem || '',
+    scope: data.scope || '',
+    deadline: data.deadline || '',
+    updates: [],
+    blockers: '',
+    result: '',
+    images: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   };
-  if (document.getElementById('edit-blockers')) updates.blockers = document.getElementById('edit-blockers').value;
-  if (document.getElementById('edit-scope')) updates.scope = document.getElementById('edit-scope').value;
-  if (document.getElementById('edit-result')) updates.result = document.getElementById('edit-result').value;
-  updateProject(editingId, updates);
-  closeModal('modal-edit');
-  renderBoard();
-  showToast('Projeto atualizado');
+  projects.push(project);
+  DB.saveProjects(projects);
+  return project;
 }
 
-function moveStage(id, direction) {
-  const p = DB.getProjects().find(x => x.id === id);
-  if (!p) return;
-  const newStage = direction === 'next' ? nextStage(p.stage) : prevStage(p.stage);
-  const stageLabel = STAGES.find(s => s.id === newStage)?.label;
-  updateProject(id, { stage: newStage, progress: newStage === 'entregue' ? 100 : p.progress });
-  addHistoryItem(id, `Etapa alterada para: ${stageLabel}`);
-  closeModal('modal-edit');
-  renderBoard();
-  showToast(`Movido para: ${stageLabel}`);
+function updateProject(id, data) {
+  const projects = DB.getProjects();
+  const idx = projects.findIndex(p => p.id === id);
+  if (idx === -1) return null;
+  projects[idx] = { ...projects[idx], ...data, updatedAt: new Date().toISOString() };
+  DB.saveProjects(projects);
+  return projects[idx];
 }
 
-function confirmDelete() {
-  if (!confirm('Excluir este projeto? Esta ação não pode ser desfeita.')) return;
-  deleteProject(editingId);
-  closeModal('modal-edit');
-  renderBoard();
-  updateNavCounts();
-  showToast('Projeto excluído');
+function deleteProject(id) {
+  const projects = DB.getProjects().filter(p => p.id !== id);
+  DB.saveProjects(projects);
 }
 
-// ── PDF EXPORT ──
-function exportProjectPDF() {
-  if (!editingId) return;
-  const p = DB.getProjects().find(x => x.id === editingId);
-  if (!p) return;
+function getProjectsByStage(stage) {
+  return DB.getProjects().filter(p => p.stage === stage);
+}
 
-  const stage = STAGES.find(s => s.id === p.stage);
-  const checklist = p.checklist || [];
+// ── IDEA CRUD ──
+function createIdea(data) {
+  const ideas = DB.getIdeas();
+  const idea = {
+    id: 'i_' + Date.now(),
+    title: data.title,
+    description: data.description || '',
+    category: data.category || '',
+    createdAt: new Date().toISOString(),
+  };
+  ideas.push(idea);
+  DB.saveIdeas(ideas);
+  return idea;
+}
+
+function deleteIdea(id) {
+  DB.saveIdeas(DB.getIdeas().filter(i => i.id !== id));
+}
+
+function promoteIdeaToProject(ideaId) {
+  const ideas = DB.getIdeas();
+  const idea = ideas.find(i => i.id === ideaId);
+  if (!idea) return;
+  const project = createProject({
+    title: idea.title,
+    description: idea.description,
+    stage: 'ideia',
+  });
+  deleteIdea(ideaId);
+  return project;
+}
+
+// ── METRICS ──
+function getMetrics() {
+  const projects = DB.getProjects();
+  const total = projects.length;
+  const delivered = projects.filter(p => p.stage === 'entregue').length;
+  const inProgress = projects.filter(p =>
+    ['execucao', 'planejamento', 'diagnostico'].includes(p.stage)
+  ).length;
+  const pending = projects.filter(p => p.stage === 'ideia').length;
+  const review = projects.filter(p => p.stage === 'revisao').length;
+  const highPriority = projects.filter(p => p.priority === 'Alta' && p.stage !== 'entregue').length;
+
+  return { total, delivered, inProgress, pending, review, highPriority };
+}
+
+// ── STAGE HELPERS ──
+function stageIndex(stageId) {
+  return STAGES.findIndex(s => s.id === stageId);
+}
+
+function nextStage(stageId) {
+  const idx = stageIndex(stageId);
+  return idx < STAGES.length - 1 ? STAGES[idx + 1].id : stageId;
+}
+
+function prevStage(stageId) {
+  const idx = stageIndex(stageId);
+  return idx > 0 ? STAGES[idx - 1].id : stageId;
+}
+
+// ── DATE HELPERS ──
+function formatDate(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function formatDateTime(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+
+function timeAgo(iso) {
+  if (!iso) return '';
+  const diff = Date.now() - new Date(iso).getTime();
+  const days = Math.floor(diff / 86400000);
+  if (days === 0) return 'hoje';
+  if (days === 1) return 'ontem';
+  if (days < 7) return days + 'd atrás';
+  if (days < 30) return Math.floor(days/7) + 'sem atrás';
+  return Math.floor(days/30) + 'm atrás';
+}
+
+// ── TOAST ──
+function showToast(message) {
+  let toast = document.getElementById('toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'toast';
+    toast.className = 'toast';
+    toast.innerHTML = '<div class="toast-dot"></div><span id="toast-msg"></span>';
+    document.body.appendChild(toast);
+  }
+  document.getElementById('toast-msg').textContent = message;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2800);
+}
+
+// ── HISTORY ──
+function addHistoryItem(projectId, text) {
+  const p = DB.getProjects().find(x => x.id === projectId);
+  if (!p || !text.trim()) return;
   const history = p.history || [];
-  const done = checklist.filter(i => i.done).length;
-  const progress = checklist.length > 0 ? Math.round(done / checklist.length * 100) : (p.progress || 0);
-  const progressBar = '█'.repeat(Math.round(progress / 10)) + '░'.repeat(10 - Math.round(progress / 10));
-
-  const priorityColor = p.priority === 'Alta' ? '#F87171' : p.priority === 'Média' ? '#F59E0B' : '#22C55E';
-  const stageColors = { ideia: '#8B5CF6', diagnostico: '#3B82F6', planejamento: '#14B8A6', execucao: '#F59E0B', revisao: '#F87171', entregue: '#22C55E' };
-  const stageColor = stageColors[p.stage] || '#8B5CF6';
-
-  const checklistHTML = checklist.length > 0 ? checklist.map(item => `
-    <tr>
-      <td style="padding:6px 0; border-bottom:1px solid #f0f0f0; width:24px;">
-        <span style="display:inline-block; width:16px; height:16px; border-radius:4px; border:2px solid ${item.done ? '#8B5CF6' : '#ccc'}; background:${item.done ? '#8B5CF6' : 'white'}; text-align:center; line-height:14px; font-size:11px; color:white;">${item.done ? '✓' : ''}</span>
-      </td>
-      <td style="padding:6px 8px; border-bottom:1px solid #f0f0f0; font-size:13px; color:${item.done ? '#999' : '#333'}; text-decoration:${item.done ? 'line-through' : 'none'};">${item.text}</td>
-    </tr>`).join('') : '<tr><td colspan="2" style="color:#999; font-size:12px; padding:8px 0;">Nenhuma tarefa cadastrada</td></tr>';
-
-  const historyHTML = history.length > 0 ? history.map(item => `
-    <div style="padding:10px 12px; margin-bottom:8px; border-left:3px solid #8B5CF6; background:#fafafa; border-radius:0 6px 6px 0;">
-      <div style="font-size:13px; color:#333; margin-bottom:4px;">${item.text}</div>
-      <div style="font-size:11px; color:#999;">${formatDateTime(item.createdAt)}</div>
-    </div>`).join('') : '<div style="color:#999; font-size:12px;">Nenhum registro no histórico</div>';
-
-  const html = `<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8"/>
-  <title>Nexus — ${p.title}</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #1a1a1a; background: white; padding: 48px; max-width: 760px; margin: 0 auto; }
-    .header { border-bottom: 3px solid #8B5CF6; padding-bottom: 20px; margin-bottom: 28px; }
-    .brand { font-size: 11px; font-weight: 600; color: #8B5CF6; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 10px; }
-    .project-title { font-size: 24px; font-weight: 700; color: #0f0f11; margin-bottom: 10px; line-height: 1.3; }
-    .badges { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
-    .badge { padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
-    .section { margin-bottom: 28px; }
-    .section-title { font-size: 11px; font-weight: 700; color: #8B5CF6; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid #eee; }
-    .section-text { font-size: 13px; color: #444; line-height: 1.7; }
-    .progress-wrap { margin: 12px 0; }
-    .progress-label { display: flex; justify-content: space-between; font-size: 12px; color: #666; margin-bottom: 6px; }
-    .progress-track { height: 8px; background: #eee; border-radius: 4px; overflow: hidden; }
-    .progress-fill { height: 100%; background: #8B5CF6; border-radius: 4px; }
-    table { width: 100%; border-collapse: collapse; }
-    .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
-    .footer-text { font-size: 11px; color: #aaa; }
-    @media print { body { padding: 32px; } }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <div class="brand">⬡ Nexus — Relatório de Projeto</div>
-    <div class="project-title">${p.title}</div>
-    <div class="badges">
-      <span class="badge" style="background:${stageColor}20; color:${stageColor}; border:1px solid ${stageColor}40;">${stage?.icon} ${stage?.label}</span>
-      <span class="badge" style="background:${priorityColor}20; color:${priorityColor}; border:1px solid ${priorityColor}40;">Prioridade ${p.priority}</span>
-      <span class="badge" style="background:#f0f0f0; color:#666;">${p.type}</span>
-      ${p.responsible ? `<span class="badge" style="background:#f0f0f0; color:#666;">👤 ${p.responsible}</span>` : ''}
-      ${p.deadline ? `<span class="badge" style="background:#f0f0f0; color:#666;">📅 Prazo: ${formatDate(p.deadline)}</span>` : ''}
-    </div>
-  </div>
-
-  ${p.problem ? `<div class="section">
-    <div class="section-title">Problema a resolver</div>
-    <div class="section-text">${p.problem}</div>
-  </div>` : ''}
-
-  ${p.description ? `<div class="section">
-    <div class="section-title">Descrição</div>
-    <div class="section-text">${p.description}</div>
-  </div>` : ''}
-
-  <div class="section">
-    <div class="section-title">Progresso</div>
-    <div class="progress-wrap">
-      <div class="progress-label">
-        <span>${checklist.length > 0 ? done + ' de ' + checklist.length + ' tarefas concluídas' : 'Progresso geral'}</span>
-        <strong>${progress}%</strong>
-      </div>
-      <div class="progress-track"><div class="progress-fill" style="width:${progress}%"></div></div>
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="section-title">Checklist de tarefas (${done}/${checklist.length})</div>
-    <table>${checklistHTML}</table>
-  </div>
-
-  <div class="section">
-    <div class="section-title">Histórico de atualizações</div>
-    ${historyHTML}
-  </div>
-
-  <div class="footer">
-    <div class="footer-text">Gerado em ${formatDateTime(new Date().toISOString())}</div>
-    <div class="footer-text" style="color:#8B5CF6; font-weight:600;">Nexus — Gestão de processos</div>
-  </div>
-
-  <script>window.onload = function() { window.print(); }<\/script>
-</body>
-</html>`;
-
-  const blob = new Blob([html], { type: 'text/html' });
-  const url = URL.createObjectURL(blob);
-  const win = window.open(url, '_blank');
-  if (!win) showToast('Permita popups para exportar o PDF');
-  else showToast('Abrindo relatório para impressão...');
+  history.unshift({ id: 'h_' + Date.now(), text: text.trim(), createdAt: new Date().toISOString() });
+  updateProject(projectId, { history });
 }
 
-// ── HISTORY UI ──
-function renderHistory(p) {
-  const container = document.getElementById('history-items');
-  const countEl = document.getElementById('history-count');
-  if (!container) return;
-  const items = p.history || [];
-
-  if (countEl) countEl.textContent = items.length > 0 ? `${items.length} registro${items.length > 1 ? 's' : ''}` : '';
-
-  if (items.length === 0) {
-    container.innerHTML = `<div style="font-size:12px; color:var(--text-muted); padding:4px 0;">Nenhum registro ainda. Adicione a primeira atualização.</div>`;
-    return;
-  }
-
-  container.innerHTML = items.map(item => `
-    <div style="display:flex; gap:10px; align-items:flex-start; padding:9px 12px; background:var(--bg-surface); border-radius:var(--radius-sm); border:1px solid var(--border); border-left:2px solid var(--purple);">
-      <div style="flex:1; min-width:0;">
-        <div style="font-size:12px; color:var(--text-primary); line-height:1.5;">${item.text}</div>
-        <div style="font-size:10px; color:var(--text-muted); margin-top:3px; font-family:var(--mono);">
-          <i class="ti ti-clock" style="font-size:10px; vertical-align:-1px;"></i>
-          ${formatDateTime(item.createdAt)}
-        </div>
-      </div>
-      <button onclick="handleDeleteHistory('${item.id}')" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:12px; padding:2px; opacity:0.4; flex-shrink:0; transition:opacity 0.15s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.4'">
-        <i class="ti ti-x"></i>
-      </button>
-    </div>`).join('');
+function deleteHistoryItem(projectId, itemId) {
+  const p = DB.getProjects().find(x => x.id === projectId);
+  if (!p) return;
+  updateProject(projectId, { history: (p.history || []).filter(h => h.id !== itemId) });
 }
 
-function addHistoryItemUI() {
-  const input = document.getElementById('history-new-input');
-  const text = input?.value.trim();
-  if (!text || !editingId) return;
-  addHistoryItem(editingId, text);
-  input.value = '';
-  const p = DB.getProjects().find(x => x.id === editingId);
-  renderHistory(p);
-  showToast('Atualização registrada');
+
+function addChecklistItem(projectId, text) {
+  const p = DB.getProjects().find(x => x.id === projectId);
+  if (!p || !text.trim()) return;
+  const checklist = p.checklist || [];
+  checklist.push({ id: 'ck_' + Date.now(), text: text.trim(), done: false, createdAt: new Date().toISOString() });
+  updateProject(projectId, { checklist });
+  autoUpdateProgress(projectId);
 }
 
-function handleDeleteHistory(itemId) {
-  if (!editingId) return;
-  deleteHistoryItem(editingId, itemId);
-  const p = DB.getProjects().find(x => x.id === editingId);
-  renderHistory(p);
+function toggleChecklistItem(projectId, itemId) {
+  const p = DB.getProjects().find(x => x.id === projectId);
+  if (!p) return;
+  const checklist = (p.checklist || []).map(item =>
+    item.id === itemId ? { ...item, done: !item.done } : item
+  );
+  updateProject(projectId, { checklist });
+  autoUpdateProgress(projectId);
 }
 
-// ── CHECKLIST UI ──
-function renderChecklist(p) {
-  const container = document.getElementById('checklist-items');
-  const summary = document.getElementById('checklist-summary');
-  if (!container) return;
-  const items = p.checklist || [];
-  const done = items.filter(i => i.done).length;
-
-  if (summary) {
-    summary.textContent = items.length > 0 ? `${done}/${items.length} concluídas` : '';
-  }
-
-  if (items.length === 0) {
-    container.innerHTML = `<div style="font-size:12px; color:var(--text-muted); padding:4px 0;">Nenhuma tarefa ainda. Adicione abaixo.</div>`;
-    return;
-  }
-
-  container.innerHTML = items.map(item => `
-    <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; background:var(--bg-surface); border-radius:var(--radius-sm); border:1px solid var(--border); group;" id="ck-row-${item.id}">
-      <button onclick="handleToggleCheck('${item.id}')" style="flex-shrink:0; width:18px; height:18px; border-radius:4px; border:1.5px solid ${item.done ? 'var(--purple)' : 'var(--border-light)'}; background:${item.done ? 'var(--purple)' : 'transparent'}; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.15s;">
-        ${item.done ? '<i class="ti ti-check" style="font-size:11px; color:#fff;"></i>' : ''}
-      </button>
-      <span style="flex:1; font-size:13px; ${item.done ? 'text-decoration:line-through; color:var(--text-muted);' : 'color:var(--text-primary);'}">${item.text}</span>
-      <button onclick="handleDeleteCheck('${item.id}')" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:13px; padding:2px 4px; opacity:0.5; transition:opacity 0.15s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.5'">
-        <i class="ti ti-x"></i>
-      </button>
-    </div>`).join('');
-
-  // Update progress slider to match
-  const progress = items.length > 0 ? Math.round((done / items.length) * 100) : 0;
-  const slider = document.getElementById('edit-progress');
-  const val = document.getElementById('edit-progress-val');
-  if (slider && items.length > 0) {
-    slider.value = progress;
-    if (val) val.textContent = progress + '%';
-  }
+function deleteChecklistItem(projectId, itemId) {
+  const p = DB.getProjects().find(x => x.id === projectId);
+  if (!p) return;
+  const checklist = (p.checklist || []).filter(i => i.id !== itemId);
+  updateProject(projectId, { checklist });
+  autoUpdateProgress(projectId);
 }
 
-function addChecklistItemUI() {
-  const input = document.getElementById('checklist-new-input');
-  const text = input?.value.trim();
-  if (!text || !editingId) return;
-  addChecklistItem(editingId, text);
-  input.value = '';
-  const p = DB.getProjects().find(x => x.id === editingId);
-  renderChecklist(p);
-  renderBoard();
+function autoUpdateProgress(projectId) {
+  const p = DB.getProjects().find(x => x.id === projectId);
+  if (!p || !p.checklist || p.checklist.length === 0) return;
+  const done = p.checklist.filter(i => i.done).length;
+  const progress = Math.round((done / p.checklist.length) * 100);
+  updateProject(projectId, { progress });
 }
 
-function handleToggleCheck(itemId) {
-  if (!editingId) return;
-  toggleChecklistItem(editingId, itemId);
-  const p = DB.getProjects().find(x => x.id === editingId);
-  renderChecklist(p);
-  renderBoard();
-}
 
-function handleDeleteCheck(itemId) {
-  if (!editingId) return;
-  deleteChecklistItem(editingId, itemId);
-  const p = DB.getProjects().find(x => x.id === editingId);
-  renderChecklist(p);
-  renderBoard();
-}
-
-// ── IMAGE RENDERING ──
-function renderEditImages(p) {
-  const grid = document.getElementById('edit-images-grid');
-  if (!grid) return;
+function addImageToProject(projectId, base64, name, imageObj) {
+  const p = DB.getProjects().find(x => x.id === projectId);
+  if (!p) return;
   const images = p.images || [];
-  if (images.length === 0) { grid.innerHTML = ''; return; }
-
-  grid.innerHTML = images.map(img => `
-    <div style="position:relative; width:80px; height:80px; border-radius:var(--radius-sm); overflow:hidden; border:1px solid var(--border); cursor:pointer; flex-shrink:0;" onclick="openImageViewer('${img.webViewLink || ''}', '${img.thumbnailUrl || img.base64 || ''}')">
-      <img src="${img.thumbnailUrl || img.base64 || ''}" style="width:100%; height:100%; object-fit:cover;" onerror="this.parentElement.innerHTML='<div style=\'width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--bg-surface);\'><i class=\'ti ti-photo-off\' style=\'color:var(--text-muted);font-size:18px;\'></i></div>'"/>
-      <div style="position:absolute; inset:0; background:rgba(0,0,0,0); transition:background 0.15s;" onmouseover="this.style.background='rgba(0,0,0,0.3)'" onmouseout="this.style.background='rgba(0,0,0,0)'"></div>
-      <button onclick="event.stopPropagation(); handleRemoveImage('${img.id}', '${img.driveFileId || ''}')" 
-        style="position:absolute; top:3px; right:3px; background:rgba(0,0,0,0.65); border:none; color:#fff; border-radius:50%; width:20px; height:20px; font-size:10px; cursor:pointer; display:flex; align-items:center; justify-content:center;">✕</button>
-      ${img.driveFileId ? `<div style="position:absolute; bottom:2px; left:2px;"><i class="ti ti-brand-google-drive" style="font-size:10px; color:rgba(255,255,255,0.8);"></i></div>` : ''}
-    </div>`).join('');
-}
-
-function openImageViewer(webViewLink, thumbUrl) {
-  const img = document.getElementById('modal-image-src');
-  const link = document.getElementById('modal-image-link');
-  img.src = thumbUrl;
-  if (webViewLink && webViewLink !== 'undefined') {
-    link.href = webViewLink;
-    link.style.display = 'inline-flex';
+  if (imageObj) {
+    images.push(imageObj);
   } else {
-    link.style.display = 'none';
+    images.push({ id: 'img_' + Date.now(), base64, name, addedAt: new Date().toISOString() });
   }
-  openModal('modal-image');
+  updateProject(projectId, { images });
 }
 
-// ── IMAGE UPLOAD ──
-async function handleImageUpload(event) {
-  const files = Array.from(event.target.files);
-  if (!editingId || files.length === 0) return;
-
-  const uploadLabel = document.getElementById('upload-label');
-  if (uploadLabel) { uploadLabel.style.opacity = '0.5'; uploadLabel.style.pointerEvents = 'none'; }
-  showToast('Enviando imagem...');
-
-  for (const file of files) {
-    if (file.size > 10 * 1024 * 1024) { showToast('Imagem muito grande (máx 10MB)'); continue; }
-
-    try {
-      let imageData;
-      if (driveIsConnected()) {
-        // Upload to Google Drive
-        const p = DB.getProjects().find(x => x.id === editingId);
-        imageData = await driveUploadImage(file, p?.title || 'Projeto');
-        imageData.id = 'img_' + Date.now();
-      } else {
-        // Fallback: base64 local
-        const base64 = await readFileAsBase64(file);
-        imageData = { id: 'img_' + Date.now(), base64, name: file.name, thumbnailUrl: base64 };
-      }
-      addImageToProject(editingId, null, file.name, imageData);
-    } catch (err) {
-      console.error(err);
-      showToast('Erro no upload: ' + err.message);
-    }
-  }
-
-  if (uploadLabel) { uploadLabel.style.opacity = '1'; uploadLabel.style.pointerEvents = 'auto'; }
-  const p = DB.getProjects().find(x => x.id === editingId);
-  renderEditImages(p);
-  renderBoard();
-  event.target.value = '';
-  showToast(driveIsConnected() ? 'Imagem salva no Drive ✓' : 'Imagem salva localmente');
+function removeImageFromProject(projectId, imgId) {
+  const p = DB.getProjects().find(x => x.id === projectId);
+  if (!p) return;
+  updateProject(projectId, { images: (p.images || []).filter(i => i.id !== imgId) });
 }
 
-async function handleRemoveImage(imgId, driveFileId) {
-  if (!editingId) return;
-  if (driveFileId && driveFileId !== 'undefined' && driveIsConnected()) {
-    await driveDeleteImage(driveFileId);
-  }
-  removeImageFromProject(editingId, imgId);
-  const p = DB.getProjects().find(x => x.id === editingId);
-  renderEditImages(p);
-  renderBoard();
-  showToast('Imagem removida');
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 
-document.querySelectorAll('.modal-overlay').forEach(overlay => {
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.add('hidden'); });
-});
 
-renderBoard();
-</script>
-</body>
-</html>
+function openModal(id) { document.getElementById(id)?.classList.remove('hidden'); }
+function closeModal(id) { document.getElementById(id)?.classList.add('hidden'); }
+
+// ── SIDEBAR ACTIVE STATE ──
+function setActiveNav() {
+  const page = location.pathname.split('/').pop() || 'index.html';
+  document.querySelectorAll('.nav-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.page === page);
+  });
+}
+
+// ── SEED DATA (first run only) ──
+function seedIfEmpty() {
+  if (localStorage.getItem('fd_seeded')) return;
+  localStorage.setItem('fd_seeded', '1');
+
+  const seeds = [
+    {
+      title: 'Automatizar preenchimento do relatório semanal',
+      description: 'O time gasta ~2h toda semana preenchendo manualmente o relatório de produtividade. Criar template automático via planilha.',
+      type: 'Automação', priority: 'Alta', stage: 'execucao', progress: 60,
+      problem: 'Processo manual e repetitivo consome tempo valioso',
+      responsible: 'Você', deadline: '2025-02-28',
+      checklist: [
+        { id: 'ck_s1', text: 'Mapear campos do relatório atual', done: true, createdAt: new Date().toISOString() },
+        { id: 'ck_s2', text: 'Criar template na planilha', done: true, createdAt: new Date().toISOString() },
+        { id: 'ck_s3', text: 'Testar com o time', done: false, createdAt: new Date().toISOString() },
+        { id: 'ck_s4', text: 'Validar com gestor', done: false, createdAt: new Date().toISOString() },
+      ],
+      history: [
+        { id: 'h_s2', text: 'Template criado na planilha, aguardando validação do time', createdAt: new Date(Date.now() - 86400000*2).toISOString() },
+        { id: 'h_s1', text: 'Projeto iniciado, mapeamento dos campos concluído', createdAt: new Date(Date.now() - 86400000*4).toISOString() },
+      ],
+    },
+    {
+      title: 'Padronizar nomenclatura de arquivos',
+      description: 'Arquivos sem padrão de nome causam dificuldade de localização. Criar guia e processo de arquivamento.',
+      type: 'Processo', priority: 'Média', stage: 'planejamento', progress: 30,
+      problem: 'Dificuldade em localizar arquivos, retrabalho constante',
+      responsible: 'Você',
+    },
+    {
+      title: 'Mapeamento do fluxo de aprovação de compras',
+      description: 'O processo de aprovação demora muito e não tem visibilidade. Mapear e propor melhoria.',
+      type: 'Fluxo', priority: 'Alta', stage: 'diagnostico', progress: 15,
+      problem: 'Aprovações levam até 5 dias sem visibilidade do status',
+      responsible: 'Você',
+    },
+    {
+      title: 'Onboarding de novos colaboradores',
+      description: 'Processo de integração não é padronizado. Criamos checklist e fluxo de boas vindas.',
+      type: 'Processo', priority: 'Média', stage: 'entregue', progress: 100,
+      responsible: 'Você', result: 'Checklist criado e validado pelo RH',
+    },
+  ];
+
+  seeds.forEach(s => createProject(s));
+
+  // Seed ideas
+  createIdea({ title: 'Dashboard de KPIs do time', description: 'Painel visual com métricas de desempenho atualizado em tempo real.', category: 'Automação' });
+  createIdea({ title: 'Processo de fechamento mensal', description: 'Padronizar e documentar todas as etapas do fechamento para reduzir erros.', category: 'Processo' });
+}
