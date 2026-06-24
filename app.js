@@ -139,14 +139,15 @@ function formatDateTime(iso) {
 }
 
 
+function timeAgo(iso) {
   if (!iso) return '';
   const diff = Date.now() - new Date(iso).getTime();
   const days = Math.floor(diff / 86400000);
   if (days === 0) return 'hoje';
   if (days === 1) return 'ontem';
-  if (days < 7) return `${days}d atrás`;
-  if (days < 30) return `${Math.floor(days/7)}sem atrás`;
-  return `${Math.floor(days/30)}m atrás`;
+  if (days < 7) return days + 'd atrás';
+  if (days < 30) return Math.floor(days/7) + 'sem atrás';
+  return Math.floor(days/30) + 'm atrás';
 }
 
 // ── TOAST ──
