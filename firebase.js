@@ -99,9 +99,9 @@ async function fbGetProjects() {
   try {
     const snap = await db.collection('projects')
       .where('userId', '==', currentUser.uid)
-      .orderBy('updatedAt', 'desc')
       .get();
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    return docs.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
   } catch (e) {
     console.error('fbGetProjects error:', e);
     return DB.getProjects();
@@ -125,9 +125,9 @@ async function fbGetIdeas() {
   try {
     const snap = await db.collection('ideas')
       .where('userId', '==', currentUser.uid)
-      .orderBy('createdAt', 'desc')
       .get();
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    return docs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   } catch (e) {
     console.error('fbGetIdeas error:', e);
     return DB.getIdeas();
