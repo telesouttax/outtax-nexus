@@ -38,6 +38,7 @@ function createProject(data) {
     updates: [],
     blockers: '',
     result: '',
+    images: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -158,7 +159,31 @@ function showToast(message) {
   setTimeout(() => toast.classList.remove('show'), 2800);
 }
 
-// ── MODAL HELPERS ──
+// ── IMAGE HELPERS ──
+function addImageToProject(projectId, base64, name) {
+  const p = DB.getProjects().find(x => x.id === projectId);
+  if (!p) return;
+  const images = p.images || [];
+  images.push({ id: 'img_' + Date.now(), base64, name, addedAt: new Date().toISOString() });
+  updateProject(projectId, { images });
+}
+
+function removeImageFromProject(projectId, imgId) {
+  const p = DB.getProjects().find(x => x.id === projectId);
+  if (!p) return;
+  updateProject(projectId, { images: (p.images || []).filter(i => i.id !== imgId) });
+}
+
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+
 function openModal(id) { document.getElementById(id)?.classList.remove('hidden'); }
 function closeModal(id) { document.getElementById(id)?.classList.add('hidden'); }
 
@@ -170,9 +195,10 @@ function setActiveNav() {
   });
 }
 
-// ── SEED DATA (first run) ──
+// ── SEED DATA (first run only) ──
 function seedIfEmpty() {
-  if (DB.getProjects().length > 0) return;
+  if (localStorage.getItem('fd_seeded')) return;
+  localStorage.setItem('fd_seeded', '1');
 
   const seeds = [
     {
