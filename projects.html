@@ -191,6 +191,22 @@
       </div>
     </div>
 
+    <!-- HISTORY SECTION -->
+    <div class="form-group">
+      <label class="form-label" style="display:flex; align-items:center; justify-content:space-between;">
+        <span>Histórico de atualizações</span>
+        <span id="history-count" style="font-size:11px; color:var(--text-muted); font-family:var(--mono);"></span>
+      </label>
+      <div style="display:flex; gap:8px; margin-bottom:10px;">
+        <input type="text" class="form-input" id="history-new-input" placeholder="O que aconteceu? Ex: Reunião realizada com o time..." style="flex:1;"
+          onkeydown="if(event.key==='Enter'){addHistoryItemUI();event.preventDefault()}"/>
+        <button class="btn btn-ghost btn-sm" onclick="addHistoryItemUI()" style="flex-shrink:0;">
+          <i class="ti ti-send"></i>
+        </button>
+      </div>
+      <div id="history-items" style="display:flex; flex-direction:column; gap:4px; max-height:200px; overflow-y:auto;"></div>
+    </div>
+
     <!-- IMAGES SECTION -->
     <div class="form-group">
       <label class="form-label" style="display:flex; align-items:center; justify-content:space-between;">
@@ -421,6 +437,7 @@ function openEditModal(id) {
 
   updateUploadUI();
   renderChecklist(p);
+  renderHistory(p);
   renderEditImages(p);
   openModal('modal-edit');
 }
@@ -450,10 +467,12 @@ function moveStage(id, direction) {
   const p = DB.getProjects().find(x => x.id === id);
   if (!p) return;
   const newStage = direction === 'next' ? nextStage(p.stage) : prevStage(p.stage);
+  const stageLabel = STAGES.find(s => s.id === newStage)?.label;
   updateProject(id, { stage: newStage, progress: newStage === 'entregue' ? 100 : p.progress });
+  addHistoryItem(id, `Etapa alterada para: ${stageLabel}`);
   closeModal('modal-edit');
   renderBoard();
-  showToast(`Movido para: ${STAGES.find(s => s.id === newStage)?.label}`);
+  showToast(`Movido para: ${stageLabel}`);
 }
 
 function confirmDelete() {
@@ -463,6 +482,53 @@ function confirmDelete() {
   renderBoard();
   updateNavCounts();
   showToast('Projeto excluído');
+}
+
+// ── HISTORY UI ──
+function renderHistory(p) {
+  const container = document.getElementById('history-items');
+  const countEl = document.getElementById('history-count');
+  if (!container) return;
+  const items = p.history || [];
+
+  if (countEl) countEl.textContent = items.length > 0 ? `${items.length} registro${items.length > 1 ? 's' : ''}` : '';
+
+  if (items.length === 0) {
+    container.innerHTML = `<div style="font-size:12px; color:var(--text-muted); padding:4px 0;">Nenhum registro ainda. Adicione a primeira atualização.</div>`;
+    return;
+  }
+
+  container.innerHTML = items.map(item => `
+    <div style="display:flex; gap:10px; align-items:flex-start; padding:9px 12px; background:var(--bg-surface); border-radius:var(--radius-sm); border:1px solid var(--border); border-left:2px solid var(--purple);">
+      <div style="flex:1; min-width:0;">
+        <div style="font-size:12px; color:var(--text-primary); line-height:1.5;">${item.text}</div>
+        <div style="font-size:10px; color:var(--text-muted); margin-top:3px; font-family:var(--mono);">
+          <i class="ti ti-clock" style="font-size:10px; vertical-align:-1px;"></i>
+          ${formatDateTime(item.createdAt)}
+        </div>
+      </div>
+      <button onclick="handleDeleteHistory('${item.id}')" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:12px; padding:2px; opacity:0.4; flex-shrink:0; transition:opacity 0.15s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.4'">
+        <i class="ti ti-x"></i>
+      </button>
+    </div>`).join('');
+}
+
+function addHistoryItemUI() {
+  const input = document.getElementById('history-new-input');
+  const text = input?.value.trim();
+  if (!text || !editingId) return;
+  addHistoryItem(editingId, text);
+  input.value = '';
+  const p = DB.getProjects().find(x => x.id === editingId);
+  renderHistory(p);
+  showToast('Atualização registrada');
+}
+
+function handleDeleteHistory(itemId) {
+  if (!editingId) return;
+  deleteHistoryItem(editingId, itemId);
+  const p = DB.getProjects().find(x => x.id === editingId);
+  renderHistory(p);
 }
 
 // ── CHECKLIST UI ──
